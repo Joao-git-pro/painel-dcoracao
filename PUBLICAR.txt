@@ -1,0 +1,16 @@
+PUBLICAR NO FIREBASE HOSTING (projeto painel-planilhas)
+
+Faça uma vez só no computador (precisa do Node.js: nodejs.org):
+  npm install -g firebase-tools
+  firebase login
+Dentro desta pasta:
+  firebase deploy --only hosting
+
+Endereço: https://painel-planilhas.web.app
+
+Domínio da empresa (opcional):
+  Firebase Console > Hosting > Adicionar domínio personalizado > painel.dcoracaohome.com
+  Copie os registros DNS que ele mostrar para o painel do registrador do domínio.
+  Depois adicione painel.dcoracaohome.com em Authentication > Settings > Authorized domains.
+
+Atualizar depois: firebase deploy --only hosting
