@@ -51,6 +51,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js"></script>
+<script src="push-config.js"></script>
 
 <style>
   /* =================================================================
@@ -1244,6 +1246,7 @@ auth.onAuthStateChanged(async user => {
     return;
   }
   myUid = user.uid;
+  if(typeof pushSetupSoon === 'function') pushSetupSoon();
 
   // registra/atualiza o próprio usuário na coleção "users" (permite que o admin o encontre depois)
   db.collection('users').doc(user.uid).set({
@@ -2330,8 +2333,8 @@ function showMsnToast(name, text, convId){
 
 function ensureNotificationPermission(){
   if('Notification' in window && Notification.permission === 'default'){
-    Notification.requestPermission();
-  }
+    Notification.requestPermission().then(() => { if(typeof pushSetupSoon === 'function') pushSetupSoon(); });
+  } else if(typeof pushSetupSoon === 'function'){ pushSetupSoon(); }
 }
 
 function updateMessagesBadge(){
@@ -2433,7 +2436,8 @@ function sendMessage(convId, otherUid, text){
     unread: { [otherUid]: firebase.firestore.FieldValue.increment(1), [myUid]: 0 }
   }, { merge: true }).then(() => {
     return convRef.collection('messages').add({ senderUid: myUid, text: trimmed, createdAt: now });
-  }).catch(err => alert('Erro ao enviar mensagem: ' + errMsg(err)));
+  }).then(() => { if(typeof pushNotifyMessage === 'function') pushNotifyMessage(convId); })
+  .catch(err => alert('Erro ao enviar mensagem: ' + errMsg(err)));
 }
 
 // ---------- DEMANDAS (chamados entre usuários) ----------
@@ -3616,7 +3620,7 @@ function buildSidebar(){
         { label: 'Nova conversa', icon: newChatSvg, action: showNewConvPicker },
         { label: 'Marcar todas como lidas', icon: checkCircleSvg, action: markAllConversationsRead },
         ('Notification' in window && Notification.permission === 'default')
-          ? { label: 'Ativar notificações', icon: bellSvg, action: () => { try{ Notification.requestPermission(); }catch(e){} } } : null,
+          ? { label: 'Ativar notificações', icon: bellSvg, action: () => { try{ Notification.requestPermission().then(pushSetupSoon); }catch(e){} } } : null,
         { label: 'Meu nome no chat', icon: userSvg, action: showMyNameModal }
       ]);
       byId('convSearch').oninput = e => { convSearchQuery = e.target.value; renderConversationList(); };
@@ -4858,7 +4862,7 @@ function renderSettingsList(){
   const email = auth.currentUser ? auth.currentUser.email : '';
   const name = myChatName.trim() || '(sem nome definido)';
   const perm = ('Notification' in window) ? Notification.permission : 'unsupported';
-  const permLabel = { granted: 'Ativadas neste navegador', denied: 'Bloqueadas — libere nas configurações do navegador', default: 'Toque para ativar', unsupported: 'Não suportadas neste navegador' }[perm];
+  const permLabel = { granted: pushStateLabel(), denied: 'Bloqueadas — libere nas configurações do navegador', default: 'Toque para ativar', unsupported: 'Não suportadas neste navegador' }[perm];
   const skinName = (SKINS.find(s => s.id === currentSkin()) || SKINS[0]).name;
   list.innerHTML = `
     <div class="profile-card">
@@ -4882,7 +4886,8 @@ function renderSettingsList(){
     look: () => { settingsPane = 'appearance'; openMain(); renderSettingsMain(); renderSettingsList(); },
     notif: () => {
       if(!('Notification' in window)) return;
-      if(Notification.permission === 'default') Notification.requestPermission().then(() => renderSettingsList());
+      if(Notification.permission === 'default') Notification.requestPermission().then(() => { renderSettingsList(); pushSetupSoon(); });
+      else if(Notification.permission === 'granted' && pushConfigured() && pushState !== 'ok'){ pushSetupSoon(); alert('Notificações ativadas. Reconectando o aviso com o app fechado…'); }
       else alert(Notification.permission === 'granted'
         ? 'As notificações já estão ativadas neste navegador.'
         : 'As notificações foram bloqueadas. Para liberar, toque no cadeado ao lado do endereço do site e permita notificações.');
@@ -4890,7 +4895,7 @@ function renderSettingsList(){
     sound: () => { setPref('dc_sound', soundsOn() ? 'off' : 'on'); renderSettingsList(); if(soundsOn()) playMessageSound(); },
     install: startInstall,
     reload: () => location.reload(),
-    logout: () => auth.signOut()
+    logout: () => pushUnregisterAndSignOut()
   };
   list.querySelectorAll('[data-set]').forEach(row => onActivate(row, () => act[row.getAttribute('data-set')]()));
 }
@@ -5092,6 +5097,81 @@ function consumeDeepLink(){
   if(['sheets', 'chats', 'demands', 'admin', 'settings'].includes(dl.section) && dl.section !== section) goSection(dl.section);
 }
 
+
+// =====================================================================
+// NOTIFICAÇÕES COM O APP FECHADO (push)
+// O aparelho se registra no Firebase Cloud Messaging; quando alguém envia uma
+// mensagem, o painel avisa o servidor (Apps Script) e ele manda o push.
+// Precisa de push-config.js preenchido (chave VAPID + endereço do Apps Script).
+// Sem isso, tudo continua como antes (avisos só com o painel aberto).
+// =====================================================================
+const PUSH = window.PUSH_CONFIG || {};
+let pushState = 'off';          // off | ok | erro | naoconfigurado | naosuportado
+let pushBusy = false;
+function pushConfigured(){ return !!(PUSH.vapidKey && PUSH.scriptUrl); }
+function pushSupported(){
+  try{
+    return canUsePWA() && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window &&
+      typeof firebase.messaging === 'function' && (!firebase.messaging.isSupported || firebase.messaging.isSupported());
+  }catch(e){ return false; }
+}
+// chamada ao servidor: sem esperar resposta (o Apps Script não libera CORS para leitura)
+async function pushCall(payload){
+  const user = auth.currentUser;
+  if(!user || !PUSH.scriptUrl) return;
+  const idToken = await user.getIdToken();
+  await fetch(PUSH.scriptUrl, {
+    method: 'POST', mode: 'no-cors', keepalive: true,
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(Object.assign({ idToken }, payload))
+  });
+}
+async function pushSetup(){
+  if(pushBusy) return;
+  if(!pushConfigured()){ pushState = 'naoconfigurado'; return; }
+  if(!pushSupported()){ pushState = 'naosuportado'; return; }
+  if(!myUid || !('Notification' in window) || Notification.permission !== 'granted') return;
+  pushBusy = true;
+  try{
+    const reg = swReg || await navigator.serviceWorker.ready;
+    const token = await firebase.messaging().getToken({ vapidKey: PUSH.vapidKey, serviceWorkerRegistration: reg });
+    if(!token){ pushState = 'erro'; return; }
+    let antigo = null; try{ antigo = localStorage.getItem('dc_push_token'); }catch(e){}
+    let quem = null; try{ quem = localStorage.getItem('dc_push_uid'); }catch(e){}
+    // só avisa o servidor quando o token ou o usuário mudou (e de vez em quando, para renovar)
+    let ultimo = 0; try{ ultimo = +localStorage.getItem('dc_push_at') || 0; }catch(e){}
+    if(token !== antigo || quem !== myUid || Date.now() - ultimo > 6 * 24 * 3600 * 1000){
+      await pushCall({ action: 'registrar', fcmToken: token });
+      try{ localStorage.setItem('dc_push_token', token); localStorage.setItem('dc_push_uid', myUid); localStorage.setItem('dc_push_at', String(Date.now())); }catch(e){}
+    }
+    pushState = 'ok';
+  }catch(err){
+    pushState = 'erro';
+    console.info('Push desativado: ' + ((err && err.message) || err));
+  }finally{
+    pushBusy = false;
+    if(section === 'settings' && myUid) renderSettingsList();
+  }
+}
+let pushTimer = null;
+function pushSetupSoon(){ clearTimeout(pushTimer); pushTimer = setTimeout(pushSetup, 600); }
+function pushNotifyMessage(convId){
+  if(!pushConfigured()) return;
+  pushCall({ action: 'msg', convId }).catch(() => {});
+}
+// ao sair, tira este aparelho da lista (para o próximo usuário do mesmo celular não receber os avisos do anterior)
+function pushUnregisterAndSignOut(){
+  let token = null; try{ token = localStorage.getItem('dc_push_token'); }catch(e){}
+  const sair = () => { try{ localStorage.removeItem('dc_push_uid'); }catch(e){} auth.signOut(); };
+  if(!token || !pushConfigured()){ sair(); return; }
+  Promise.race([pushCall({ action: 'desregistrar', fcmToken: token }), new Promise(r => setTimeout(r, 2500))]).catch(() => {}).then(sair);
+}
+function pushStateLabel(){
+  if(pushState === 'ok') return 'Ativadas — também chegam com o app fechado';
+  if(pushState === 'erro') return 'Ativadas neste navegador (aviso com app fechado indisponível agora)';
+  return 'Ativadas neste navegador';
+}
+
 function registerSW(){
   if(!('serviceWorker' in navigator) || !canUsePWA()) return;
   navigator.serviceWorker.addEventListener('message', e => {
@@ -5103,7 +5183,7 @@ function registerSW(){
     } else if(d.section && myUid) goSection(d.section);
   });
   const go = () => navigator.serviceWorker.register('sw.js')
-    .then(reg => { swReg = reg; })
+    .then(reg => { swReg = reg; pushSetupSoon(); })
     .catch(err => console.info('App instalável desativado: sw.js não está publicado ao lado do index.html (' + ((err && err.message) || err) + ')'));
   if(document.readyState === 'complete') go(); else window.addEventListener('load', go);
 }

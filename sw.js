@@ -6,16 +6,17 @@
 //   nova, ela aparece na próxima abertura (a cópia guardada só é usada offline).
 // - Mostra as notificações de mensagem no Android (lá o navegador só permite
 //   notificação através do service worker) e abre a conversa ao tocar nela.
+// - Recebe notificações push (Firebase Cloud Messaging) mesmo com o app FECHADO.
 // - NÃO mexe nas requisições do Firestore/login (essas passam direto).
 // Ao mudar este arquivo, troque a VERSAO para os aparelhos atualizarem o cache.
 // =====================================================================
-const VERSAO = '2026-10-13-v4';
+const VERSAO = '2026-10-14-v5';
 const CACHE = 'painel-dc-' + VERSAO;
 const BASE = self.registration.scope;               // ex.: https://dcoracaohome.netlify.app/
 const CASCA = ['./', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png',
   './icons/icon-maskable-512.png', './icons/apple-touch-icon.png', './icons/favicon-32.png', './icons/badge-96.png']
   .map(p => new URL(p, BASE).href);
-const FIREBASE_JS = ['firebase-app-compat.js', 'firebase-auth-compat.js', 'firebase-firestore-compat.js']
+const FIREBASE_JS = ['firebase-app-compat.js', 'firebase-auth-compat.js', 'firebase-firestore-compat.js', 'firebase-messaging-compat.js']
   .map(f => 'https://www.gstatic.com/firebasejs/10.7.1/' + f);
 
 self.addEventListener('install', event => {
@@ -82,6 +83,39 @@ self.addEventListener('fetch', event => {
     }).catch(() => null);
     if(hit){ event.waitUntil(rede); return hit; }
     return (await rede) || Response.error();
+  })());
+});
+
+// ---------------------------------------------------------------------
+// PUSH (Firebase Cloud Messaging): chega mesmo com o app fechado.
+// O servidor (Apps Script) manda uma mensagem só com "data"; quem monta o
+// aviso aqui é o service worker. Toda mensagem push PRECISA mostrar um aviso
+// (regra do iPhone/Safari), por isso só deixamos de mostrar quando o painel
+// já está aberto e em foco no Android/PC (lá o app mostra o próprio aviso).
+// ---------------------------------------------------------------------
+self.addEventListener('push', event => {
+  let d = {};
+  try{
+    const j = event.data ? event.data.json() : {};
+    d = (j && (j.data || (j.notification && Object.assign({}, j.notification, j.data)))) || j || {};
+  }catch(e){
+    try{ d = { body: event.data.text() }; }catch(_){ d = {}; }
+  }
+  const titulo = d.title || 'D Coração Home';
+  const opts = {
+    body: d.body || 'Você tem uma nova mensagem',
+    tag: d.convId ? 'conv-' + d.convId : 'dc-aviso',
+    renotify: true,
+    icon: new URL('./icons/icon-192.png', BASE).href,
+    badge: new URL('./icons/badge-96.png', BASE).href,
+    data: { convId: d.convId || null, section: d.section || null }
+  };
+  event.waitUntil((async () => {
+    const janelas = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const emFoco = janelas.some(w => w.visibilityState === 'visible' && w.focused);
+    const ios = /iPhone|iPad|iPod/.test((self.navigator && self.navigator.userAgent) || '');
+    if(emFoco && !ios) return;
+    await self.registration.showNotification(titulo, opts);
   })());
 });
 
