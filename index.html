@@ -915,6 +915,15 @@
   .day-sep span{border:1px solid var(--line); color:var(--ink-soft);}
   html[data-skin="telegram"] .row.active .row-sub, html[data-skin="telegram"] .row.active .row-time,
   html[data-skin="telegram"] .row.active .row-meta, html[data-skin="telegram"] .row.active .row-sub.typing{color:#fff;}
+
+  /* ---- D Coração: contraste reforçado nas conversas ---- */
+  html[data-skin="dcoracao"]{ --out-bg:#7a5539; --out-solid:#7a5539; --out-ink:#ffffff; --out-meta:#f3e4d6; --tick:#f3e4d6; --tick-read:#ffe9a8; }
+  html[data-skin="dcoracao"][data-mode="dark"]{
+    --ink:#fff6ec; --ink-soft:#d2c0ad; --head-sub:#d2c0ad;
+    --out-bg:#d4a57a; --out-solid:#d4a57a; --out-ink:#1d1611; --out-meta:#4a3322; --tick:#4a3322; --tick-read:#07407f;
+    --in-bg:#42352a; --in-solid:#42352a; --in-ink:#fff6ec; --in-meta:#d9c8b6; --link:#f2c999;
+  }
+  .bubble{font-size:15.5px;}
 </style>
 </head>
 <body>
