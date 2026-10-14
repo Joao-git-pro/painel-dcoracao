@@ -1,0 +1,26 @@
+{
+  "id": "./",
+  "name": "Painel D Coração Home",
+  "short_name": "D Coração",
+  "description": "Planilhas, conversas e demandas da equipe D Coração Home.",
+  "lang": "pt-BR",
+  "dir": "ltr",
+  "start_url": "./?origem=app",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#faf5ef",
+  "theme_color": "#6d4c37",
+  "categories": ["business", "productivity"],
+  "prefer_related_applications": false,
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Conversas", "short_name": "Conversas", "url": "./?s=chats", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" }] },
+    { "name": "Demandas", "short_name": "Demandas", "url": "./?s=demands", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" }] },
+    { "name": "Planilhas", "short_name": "Planilhas", "url": "./?s=sheets", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" }] }
+  ]
+}

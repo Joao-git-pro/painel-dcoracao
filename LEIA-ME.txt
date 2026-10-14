@@ -1,0 +1,23 @@
+PAINEL D CORAÇÃO HOME — app instalável (Android, iPhone e PC)
+
+COMO PUBLICAR (Netlify)
+1. Entre em app.netlify.com > seu site (dcoracaohome) > Deploys.
+2. Arraste esta PASTA inteira (não só o index.html) para a área "Drag and drop".
+   Ela precisa ter: index.html, manifest.webmanifest, sw.js, _headers e a pasta icons.
+3. Abra o endereço https do site no celular.
+(Em outro servidor, ex.: GitHub Pages, é igual: os arquivos ficam juntos na mesma pasta.)
+
+COMO INSTALAR
+- Android (Chrome): botão "Instalar" no painel, ou menu ⋮ > Instalar app.
+- iPhone/iPad (Safari): Compartilhar > Adicionar à Tela de Início > Adicionar.
+- PC (Chrome/Edge): ícone de instalar no fim da barra de endereço.
+No iPhone, o app instalado pede login uma vez (ele não usa o login do Safari).
+
+ATUALIZAR DEPOIS
+- Mudou só o index.html: publique de novo. O app pega a versão nova na próxima abertura.
+- Mudou ícones ou sw.js: troque a linha VERSAO no começo do sw.js antes de publicar.
+
+O QUE NÃO MUDA
+- Firebase, coleções e regras de segurança continuam iguais.
+- Notificação com o app FECHADO precisaria de Firebase Cloud Messaging + servidor
+  (não incluído). Com o app aberto ou em segundo plano, os avisos funcionam.
