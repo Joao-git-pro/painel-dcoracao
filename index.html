@@ -1664,6 +1664,42 @@ function exportBackup(){
   logActivity('exportou', 'backup do painel');
 }
 
+function importBackup(){
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = '.json,application/json';
+  inp.onchange = () => {
+    const f = inp.files && inp.files[0]; if(!f) return;
+    const rd = new FileReader();
+    rd.onload = async () => {
+      let abas;
+      try{ abas = JSON.parse(rd.result).abas; if(!Array.isArray(abas)) throw 0; }
+      catch(e){ alert('Arquivo inválido. Use o JSON gerado por "Exportar backup".'); return; }
+      const novas = abas.filter(a => a && a.nome && !categories.some(c => c.name === a.nome));
+      const nLinks = novas.reduce((n, a) => n + (a.links || []).length, 0);
+      const puladas = abas.length - novas.length;
+      if(!novas.length){ alert('Nada para importar: todas as abas do arquivo já existem.'); return; }
+      if(!confirm('Importar ' + novas.length + ' aba(s) com ' + nLinks + ' link(s)?' + (puladas ? '\n(' + puladas + ' aba(s) com o mesmo nome serão ignoradas.)' : '') + '\nAs abas entram liberadas para todos; depois ajuste os acessos em cada aba.')) return;
+      try{
+        const ts = firebase.firestore.FieldValue.serverTimestamp();
+        let ord = categories.reduce((m, c) => Math.max(m, c.order || 0), 0);
+        for(const a of novas){
+          const batch = db.batch();
+          const ref = db.collection('categories').doc();
+          batch.set(ref, { name: String(a.nome).trim(), allowedUsers: [], allowedGroups: [], order: ++ord, createdAt: ts });
+          (a.links || []).forEach((l, i) => {
+            batch.set(ref.collection('links').doc(), { title: String(l.titulo || '').trim(), url: String(l.url || '').trim(), order: (typeof l.ordem === 'number' ? l.ordem : i), createdAt: ts });
+          });
+          await batch.commit();
+        }
+        logActivity('importou', 'backup (' + novas.length + ' abas)');
+        alert('Importação concluída: ' + novas.length + ' aba(s), ' + nLinks + ' link(s).');
+      }catch(err){ alert('Erro ao importar: ' + errMsg(err)); }
+    };
+    rd.readAsText(f);
+  };
+  inp.click();
+}
+
 function showEditLinkModal(cat, link){
   const root = document.getElementById('modalRoot');
   root.innerHTML = `
@@ -4775,7 +4811,8 @@ function renderAdminList(){
     { id: 'groups', label: 'Grupos de acesso', sub: 'Liberar abas para grupos inteiros', icon: shieldSvg, fn: showGroupsModal },
     { id: 'newcat', label: 'Nova aba de planilhas', sub: 'Criar uma categoria de links', icon: folderPlusSvg, fn: showAddCategoryModal },
     { id: 'activity', label: 'Atividade recente', sub: 'Quem fez o quê e quando', icon: activitySvg, fn: showActivityModal },
-    { id: 'backup', label: 'Exportar backup', sub: 'Baixar abas e links em JSON', icon: downloadSvg, fn: exportBackup }
+    { id: 'backup', label: 'Exportar backup', sub: 'Baixar abas e links em JSON', icon: downloadSvg, fn: exportBackup },
+    { id: 'import', label: 'Importar backup', sub: 'Restaurar abas e links de um JSON', icon: downloadSvg, fn: importBackup }
   ];
   const overviewActive = !isMobile() || mainOpen;
   list.innerHTML = items.map(it => `
