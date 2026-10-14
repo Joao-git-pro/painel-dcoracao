@@ -240,6 +240,22 @@
   }
 
   /* =================================================================
+     AJUSTE DE CONTRASTE (legibilidade) — só altera cores que ficavam
+     abaixo do contraste mínimo; o resto do tema continua igual.
+     ================================================================= */
+  html[data-skin="dcoracao"]{ --ink-soft:#6f5f51; --head-sub:#6f5f51; --in-meta:#816e5f; --out-bg:#916e52; --out-solid:#916e52; --out-meta:#fffffe; --tick:#eae3dd; --tick-list:#498dd5; }
+  html[data-skin="dcoracao"][data-mode="dark"]{ --in-bg:#3a2f27; --in-solid:#3a2f27; --in-meta:#b9a794; --out-meta:#e4d5c9; }
+  html[data-skin="discord"]{ --ink-soft:#585a62; --head-sub:#585a62; --tick-read:#0080c0; --link:#0066d9; }
+  html[data-skin="discord"][data-mode="dark"]{ --ink-soft:#afb4bb; --head-sub:#afb4bb; --accent-strong:#a8aef9; }
+  html[data-skin="messenger"]{ --accent-strong:#075fed; --link:#075eeb; }
+  html[data-skin="messenger"][data-mode="dark"]{ --in-bg:#323232; --in-solid:#323232; --accent-strong:#63a9ff; --link:#4e9eff; }
+  html[data-skin="teams"][data-mode="dark"]{ --in-bg:#2f2f2f; --in-solid:#2f2f2f; }
+  html[data-skin="telegram"]{ --ink-soft:#676c6f; --head-sub:#676c6f; --in-meta:#6c7278; --out-meta:#3a7f39; --tick:#439442; --tick-read:#439442; --accent-strong:#236bb2; --link:#2973bd; --rail-fg:#6a6f73; }
+  html[data-skin="telegram"][data-mode="dark"]{ --out-bg:#7766c6; --out-solid:#7766c6; --out-meta:#fefeff; --tick:#e3e0f3; }
+  html[data-skin="whatsapp"]{ --ink-soft:#596870; --head-sub:#596870; --in-meta:#63737d; --out-meta:#5f7079; --tick:#73818a; --tick-read:#3b86a7; --accent-strong:#007863; --link:#0279ae; }
+  html[data-skin="whatsapp"][data-mode="dark"]{ --ink-soft:#99a7af; --head-sub:#99a7af; --in-bg:#243037; --in-solid:#243037; --out-meta:#b0cac7; }
+
+  /* =================================================================
      BASE
      ================================================================= */
   *{box-sizing:border-box;}
@@ -887,6 +903,18 @@
   @media (prefers-reduced-motion: reduce){
     *{animation:none !important; transition:none !important;}
   }
+
+  /* ---- AJUSTE DE LEGIBILIDADE: contorno nos balões recebidos, textos pequenos maiores ---- */
+  .msg.theirs .bubble{box-shadow:0 0 0 1px rgba(128,128,128,.28), var(--bubble-shadow);}
+  .msg.theirs .bubble{box-shadow:0 0 0 1px color-mix(in srgb, var(--ink) 16%, transparent), var(--bubble-shadow);}
+  .msg-meta{font-size:12px;}
+  .bubble{font-size:15px; line-height:1.45;}
+  .row-time{font-size:12px;}
+  .row-sub{font-size:13.5px;}
+  .deleted-txt{opacity:.92;}
+  .day-sep span{border:1px solid var(--line); color:var(--ink-soft);}
+  html[data-skin="telegram"] .row.active .row-sub, html[data-skin="telegram"] .row.active .row-time,
+  html[data-skin="telegram"] .row.active .row-meta, html[data-skin="telegram"] .row.active .row-sub.typing{color:#fff;}
 </style>
 </head>
 <body>
