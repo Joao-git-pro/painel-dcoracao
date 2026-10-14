@@ -10,7 +10,7 @@
 // - NÃO mexe nas requisições do Firestore/login (essas passam direto).
 // Ao mudar este arquivo, troque a VERSAO para os aparelhos atualizarem o cache.
 // =====================================================================
-const VERSAO = '2026-10-14-v6';
+const VERSAO = '2026-10-14-v7';
 const CACHE = 'painel-dc-' + VERSAO;
 const BASE = self.registration.scope;               // ex.: https://dcoracaohome.netlify.app/
 const CASCA = ['./', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png',

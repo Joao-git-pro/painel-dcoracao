@@ -1700,6 +1700,66 @@ function importBackup(){
   inp.click();
 }
 
+async function exportUsers(){
+  try{
+    const adm = new Set((await db.collection('admins').get()).docs.map(d => d.id));
+    const gname = Object.fromEntries(allGroups.map(g => [g.id, g.name]));
+    const usuarios = allUsers.map(u => ({
+      email: u.email, nome: u.chatName || '', bloqueado: u.blocked, admin: adm.has(u.uid),
+      grupos: (u.groups || []).map(id => gname[id] || id)
+    }));
+    const blob = new Blob([JSON.stringify({ exportadoEm: new Date().toISOString(), usuarios }, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `usuarios-painel-${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    logActivity('exportou', 'usuários do painel');
+  }catch(e){ alert('Erro ao exportar: ' + errMsg(e)); }
+}
+
+function importUsers(){
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = '.json,application/json';
+  inp.onchange = () => {
+    const f = inp.files && inp.files[0]; if(!f) return;
+    const rd = new FileReader();
+    rd.onload = async () => {
+      let lista;
+      try{ lista = JSON.parse(rd.result).usuarios; if(!Array.isArray(lista)) throw 0; }
+      catch(e){ alert('Arquivo inválido. Use o JSON gerado por "Exportar usuários".'); return; }
+      const jaTem = new Set(allUsers.map(u => (u.email || '').toLowerCase()));
+      const novos = lista.filter(u => u && u.email && !jaTem.has(String(u.email).toLowerCase()));
+      if(!novos.length){ alert('Nada para importar: todos já existem.'); return; }
+      const pass = prompt('Importar ' + novos.length + ' pessoa(s).\nDefina UMA senha temporária para todas (mín. 6 caracteres). Cada pessoa troca no primeiro acesso:');
+      if(pass === null) return;
+      if(pass.length < 6){ alert('A senha precisa ter pelo menos 6 caracteres.'); return; }
+      const gid = {}; allGroups.forEach(g => { gid[g.name] = g.id; });
+      let ok = 0; const falhas = [];
+      for(const u of novos){
+        try{
+          const nomes = Array.isArray(u.grupos) ? u.grupos : [];
+          for(const n of nomes){
+            if(!gid[n]){ const r = await db.collection('groups').add({ name: n, createdAt: firebase.firestore.FieldValue.serverTimestamp() }); gid[n] = r.id; }
+          }
+          const cred = await secondaryAuth.createUserWithEmailAndPassword(String(u.email).trim(), pass);
+          const uid = cred.user.uid;
+          const doc = { email: cred.user.email || u.email, mustChangePassword: true, groups: nomes.map(n => gid[n]), createdAt: firebase.firestore.FieldValue.serverTimestamp() };
+          if(u.nome) doc.chatName = u.nome;
+          await db.collection('users').doc(uid).set(doc, { merge: true });
+          if(u.admin) await db.collection('admins').doc(uid).set({ email: doc.email, promotedBy: myUid, promotedAt: firebase.firestore.FieldValue.serverTimestamp() });
+          if(u.bloqueado) await db.collection('users').doc(uid).set({ blocked: true }, { merge: true });
+          try{ await secondaryAuth.signOut(); }catch(e){}
+          ok++;
+        }catch(err){ falhas.push(u.email + ': ' + errMsg(err)); try{ await secondaryAuth.signOut(); }catch(e){} }
+      }
+      logActivity('importou', 'usuários (' + ok + ')');
+      alert('Criadas: ' + ok + ' conta(s).' + (falhas.length ? '\nFalharam:\n' + falhas.join('\n') : '') + '\nSenha temporária: ' + pass);
+    };
+    rd.readAsText(f);
+  };
+  inp.click();
+}
+
 function showEditLinkModal(cat, link){
   const root = document.getElementById('modalRoot');
   root.innerHTML = `
@@ -4812,7 +4872,9 @@ function renderAdminList(){
     { id: 'newcat', label: 'Nova aba de planilhas', sub: 'Criar uma categoria de links', icon: folderPlusSvg, fn: showAddCategoryModal },
     { id: 'activity', label: 'Atividade recente', sub: 'Quem fez o quê e quando', icon: activitySvg, fn: showActivityModal },
     { id: 'backup', label: 'Exportar backup', sub: 'Baixar abas e links em JSON', icon: downloadSvg, fn: exportBackup },
-    { id: 'import', label: 'Importar backup', sub: 'Restaurar abas e links de um JSON', icon: downloadSvg, fn: importBackup }
+    { id: 'import', label: 'Importar backup', sub: 'Restaurar abas e links de um JSON', icon: downloadSvg, fn: importBackup },
+    { id: 'expusers', label: 'Exportar usuários', sub: 'Baixar e-mails, grupos e admins em JSON', icon: downloadSvg, fn: exportUsers },
+    { id: 'impusers', label: 'Importar usuários', sub: 'Criar contas de um JSON (senha temporária)', icon: downloadSvg, fn: importUsers }
   ];
   const overviewActive = !isMobile() || mainOpen;
   list.innerHTML = items.map(it => `
