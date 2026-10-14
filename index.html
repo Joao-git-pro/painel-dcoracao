@@ -1447,6 +1447,7 @@ function listenCategories(){
 // a pessoa vê a aba se: é admin; OU a aba não tem restrição nenhuma (nem pessoas nem grupos);
 // OU ela está na lista de pessoas; OU pertence a algum dos grupos liberados.
 // (mesma lógica das regras do Firestore — se mudar aqui, mudar lá)
+const SO_ADMIN = '__so_admin__'; // marcador gravado em allowedUsers: ninguém casa com ele, então só admin enxerga a aba
 function canSeeCategory(cat){
   if(isAdmin) return true;
   const users = cat.allowedUsers || [];
@@ -1495,7 +1496,7 @@ function addCategory(name){
   const maxOrder = categories.reduce((m, c) => Math.max(m, c.order || 0), 0);
   db.collection('categories').add({
     name: name.trim(),
-    allowedUsers: [],
+    allowedUsers: [SO_ADMIN],
     allowedGroups: [],
     order: maxOrder + 1,
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -1681,7 +1682,7 @@ async function importAbas(abas){
   for(const a of novas){
     const batch = db.batch();
     const ref = db.collection('categories').doc();
-    batch.set(ref, { name: String(a.nome).trim(), allowedUsers: [], allowedGroups: [], order: ++ord, createdAt: ts });
+    batch.set(ref, { name: String(a.nome).trim(), allowedUsers: [SO_ADMIN], allowedGroups: [], order: ++ord, createdAt: ts });
     (a.links || []).forEach((l, i) => {
       batch.set(ref.collection('links').doc(), { title: String(l.titulo || '').trim(), url: String(l.url || '').trim(), order: (typeof l.ordem === 'number' ? l.ordem : i), createdAt: ts });
     });
@@ -3207,8 +3208,10 @@ function restrictionSummary(cat){
   const nu = (cat.allowedUsers || []).length;
   const ng = (cat.allowedGroups || []).length;
   if(!nu && !ng) return 'Visível para todos os usuários logados';
+  const onlyAdm = (cat.allowedUsers || []).includes(SO_ADMIN);
+  if(onlyAdm && nu === 1 && !ng) return 'Só administradores';
   const parts = [];
-  if(nu) parts.push(`${nu} usuário(s)`);
+  if(nu - (onlyAdm ? 1 : 0)) parts.push(`${nu - (onlyAdm ? 1 : 0)} usuário(s)`);
   if(ng) parts.push(`${ng} grupo(s)`);
   return 'Restrita a ' + parts.join(' e ');
 }
@@ -3234,7 +3237,7 @@ function showAccessModal(cat){
     <div class="modal-bg" id="modalBg">
       <div class="modal" style="max-width:400px;">
         <h3>Acesso à aba "${escapeHtml(cat.name)}"</h3>
-        <p style="font-size:12px;color:var(--ink-soft);margin:-6px 0 14px;">Deixe <b>tudo desmarcado</b> (pessoas e grupos) para que <b>todos</b> os usuários logados vejam esta aba. Marcando pessoas ou grupos, só eles vão ver (você, como admin, sempre vê tudo).</p>
+        <p style="font-size:12px;color:var(--ink-soft);margin:-6px 0 14px;">Deixe <b>tudo desmarcado</b> para que <b>só administradores</b> vejam esta aba. Marcando pessoas ou grupos, só eles (e os admins) vão ver.</p>
         <div style="font-size:11px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">Grupos</div>
         <div style="max-height:120px;overflow-y:auto;border-top:1px solid var(--paper-dim);border-bottom:1px solid var(--paper-dim);margin-bottom:12px;">${groupRows}</div>
         <div style="font-size:11px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">Pessoas</div>
@@ -3250,12 +3253,8 @@ function showAccessModal(cat){
   document.getElementById('confirmAccess').onclick = () => {
     const checkedUsers = [...document.querySelectorAll('.access-check:checked')].map(el => el.value);
     const checkedGroups = [...document.querySelectorAll('.access-group-check:checked')].map(el => el.value);
-    // não deixa apagar sem querer a restrição de quem já não aparece na lista (ex.: usuário removido):
-    // se a aba já era restrita e o admin desmarcou tudo, é intencional (vira pública) — mas pedimos confirmação
-    if(isCategoryRestricted(cat) && !checkedUsers.length && !checkedGroups.length){
-      if(!confirm(`Nenhuma pessoa ou grupo marcado: a aba "${cat.name}" vai ficar visível para TODOS os usuários logados. Continuar?`)) return;
-    }
-    setCategoryAccess(cat.id, checkedUsers, checkedGroups);
+    // nada marcado = só admin (nunca vira pública sem querer)
+    setCategoryAccess(cat.id, (checkedUsers.length || checkedGroups.length) ? checkedUsers : [SO_ADMIN], checkedGroups);
     root.innerHTML = '';
   };
 }
@@ -4869,6 +4868,21 @@ function autoMarkOpenDemandRead(){
 // =====================================================================
 // ADMINISTRAÇÃO
 // =====================================================================
+async function restringirTodasAbas(){
+  const abertas = categories.filter(c => !(c.allowedUsers || []).length && !(c.allowedGroups || []).length);
+  if(!abertas.length){ alert('Todas as abas já têm restrição.'); return; }
+  if(!confirm(`${abertas.length} aba(s) hoje visíveis para todos vão passar a ser só de administradores:\n\n- ${abertas.map(c => c.name).join('\n- ')}\n\nDepois, libere cada aba para quem precisa (ícone de pessoas dentro da aba, ou Grupos de acesso). Continuar?`)) return;
+  try{
+    for(let i = 0; i < abertas.length; i += 400){
+      const batch = db.batch();
+      abertas.slice(i, i + 400).forEach(c => batch.update(db.collection('categories').doc(c.id), { allowedUsers: [SO_ADMIN] }));
+      await batch.commit();
+    }
+    logActivity('restringiu todas as abas sem restrição', abertas.length + ' aba(s)');
+    alert('Pronto: ' + abertas.length + ' aba(s) agora são só de administradores.');
+  } catch(e){ alert('Erro ao restringir abas: ' + errMsg(e)); }
+}
+
 function renderAdminList(){
   if(section !== 'admin') return;
   const list = byId('sideList'); if(!list) return;
@@ -4879,6 +4893,7 @@ function renderAdminList(){
     { id: 'groups', label: 'Grupos de acesso', sub: 'Liberar abas para grupos inteiros', icon: shieldSvg, fn: showGroupsModal },
     { id: 'newcat', label: 'Nova aba de planilhas', sub: 'Criar uma categoria de links', icon: folderPlusSvg, fn: showAddCategoryModal },
     { id: 'activity', label: 'Atividade recente', sub: 'Quem fez o quê e quando', icon: activitySvg, fn: showActivityModal },
+    { id: 'lockall', label: 'Restringir todas as abas', sub: 'Abas sem restrição passam a ser só de admin', icon: shieldSvg, fn: restringirTodasAbas },
     { id: 'backup', label: 'Backup', sub: 'Baixar ou restaurar abas, links e pessoas', icon: downloadSvg, fn: showBackupModal }
   ];
   const overviewActive = !isMobile() || mainOpen;
