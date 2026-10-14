@@ -17,7 +17,10 @@ ATUALIZAR DEPOIS
 - Mudou só o index.html: publique de novo. O app pega a versão nova na próxima abertura.
 - Mudou ícones ou sw.js: troque a linha VERSAO no começo do sw.js antes de publicar.
 
+NOTIFICAÇÕES COM O APP FECHADO
+- Veja o arquivo CONFIGURAR-NOTIFICACOES.txt (passo a passo; usa o Apps Script da pasta apps-script).
+- Enquanto o push-config.js estiver vazio, o painel funciona como antes.
+
 O QUE NÃO MUDA
 - Firebase, coleções e regras de segurança continuam iguais.
-- Notificação com o app FECHADO precisaria de Firebase Cloud Messaging + servidor
-  (não incluído). Com o app aberto ou em segundo plano, os avisos funcionam.
+- Notificação com o app FECHADO: ver CONFIGURAR-NOTIFICACOES.txt.
