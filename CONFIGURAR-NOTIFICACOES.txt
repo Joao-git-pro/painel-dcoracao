@@ -1,0 +1,36 @@
+NOTIFICAÇÕES COM O APP FECHADO — passo a passo (feito uma vez só)
+
+Como funciona: o painel avisa um pequeno servidor (Apps Script do Google) quando alguém
+manda mensagem ou cria uma demanda; o servidor envia o aviso pelo Firebase para o celular
+de quem deve receber, mesmo com o app fechado.
+
+JÁ FEITO: a chave VAPID já está no push-config.js (vapidKey).
+
+1) CONTA DE SERVIÇO DO FIREBASE (projeto d-coracao)
+   Firebase Console > engrenagem > Configurações do projeto > aba "Contas de serviço"
+   > "Gerar nova chave privada" > Gerar chave. Baixa um arquivo .json.
+   Esse arquivo é SENHA: não envie no chat, não coloque no GitHub.
+
+2) CRIAR O APPS SCRIPT
+   script.google.com > Novo projeto (use a conta joao@dcoracaohome.com).
+   Nome: "Push Painel D Coração". Apague o conteúdo e cole o arquivo apps-script/Codigo.gs.
+   Em Configurações do projeto (engrenagem) > Propriedades do script > Adicionar:
+     Propriedade: SA_JSON     Valor: o conteúdo inteiro do arquivo .json do passo 1.
+   Salve. No editor, escolha a função "testarConfiguracao" > Executar > autorize.
+   Deve aparecer "Token OAuth ok: true" no log.
+
+3) PUBLICAR
+   Implantar > Nova implantação > tipo "Aplicativo da Web"
+     Executar como: Eu
+     Quem pode acessar: Qualquer pessoa
+   Implantar > copie a URL que termina com /exec.
+
+4) LIGAR NO PAINEL
+   Coloque a URL no push-config.js (campo scriptUrl) e publique o painel de novo.
+
+5) CADA PESSOA
+   Abrir o painel, permitir notificações e (no iPhone) instalar o app na tela de início.
+   Em Ajustes deve aparecer "Ativadas — também chegam com o app fechado".
+
+Se mexer no Codigo.gs depois: Implantar > Gerenciar implantações > editar > Nova versão.
+Sem o servidor configurado, o painel funciona normal (avisos só com o painel aberto).
