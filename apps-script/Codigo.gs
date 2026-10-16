@@ -6,8 +6,9 @@
 // mesmo com o app fechado.
 //
 // Configuração (veja CONFIGURAR-NOTIFICACOES.txt):
-//   Configurações do projeto > Propriedades do script > SA_JSON =
-//   conteúdo inteiro do arquivo .json da conta de serviço do Firebase (d-coracao).
+//   O script roda "como o dono" (você) e usa o login do dono para falar com o
+//   Firebase — não precisa de chave/arquivo. O projeto do Apps Script precisa estar
+//   ligado ao projeto Google Cloud d-coracao (veja CONFIGURAR-NOTIFICACOES.txt).
 // =====================================================================
 const PROJECT_ID = 'd-coracao';
 const WEB_API_KEY = 'AIzaSyCQAtYX8k8d_WPevHNlHkzyn2vn9cbRfs0';   // mesma chave pública do index.html
@@ -159,35 +160,14 @@ function enviar_(uidDestino, dados){
 }
 
 // ---------------------------------------------------------------------
-// Conta de serviço: token OAuth (guardado em cache por ~50 min)
+// Acesso ao Firebase: usa o login do dono do script (sem chave de conta de serviço)
 // ---------------------------------------------------------------------
 function tokenAcesso_(){
-  const cache = CacheService.getScriptCache();
-  const guardado = cache.get('oauth');
-  if(guardado) return guardado;
-  const sa = JSON.parse(PropertiesService.getScriptProperties().getProperty('SA_JSON') || 'null');
-  if(!sa || !sa.private_key) throw new Error('SA_JSON não configurado nas propriedades do script');
-  const agora = Math.floor(Date.now() / 1000);
-  const b64 = s => Utilities.base64EncodeWebSafe(s).replace(/=+$/, '');
-  const cab = b64(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
-  const corpo = b64(JSON.stringify({
-    iss: sa.client_email, sub: sa.client_email,
-    scope: 'https://www.googleapis.com/auth/firebase.messaging https://www.googleapis.com/auth/datastore',
-    aud: 'https://oauth2.googleapis.com/token', iat: agora, exp: agora + 3600
-  }));
-  const assinatura = Utilities.base64EncodeWebSafe(Utilities.computeRsaSha256Signature(cab + '.' + corpo, sa.private_key)).replace(/=+$/, '');
-  const r = UrlFetchApp.fetch('https://oauth2.googleapis.com/token', {
-    method: 'post', muteHttpExceptions: true,
-    payload: { grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: cab + '.' + corpo + '.' + assinatura }
-  });
-  if(r.getResponseCode() !== 200) throw new Error('OAuth ' + r.getResponseCode() + ': ' + r.getContentText().slice(0, 200));
-  const tk = JSON.parse(r.getContentText()).access_token;
-  cache.put('oauth', tk, 3000);
-  return tk;
+  return ScriptApp.getOAuthToken();
 }
 
 // ---------------------------------------------------------------------
-// Firestore (REST, como conta de serviço — ignora as regras de segurança)
+// Firestore (REST, com o login do dono do script — ignora as regras de segurança)
 // ---------------------------------------------------------------------
 function lerDoc_(caminho){
   const r = UrlFetchApp.fetch('https://firestore.googleapis.com/v1/projects/' + PROJECT_ID + '/databases/(default)/documents/' + caminho, {
@@ -207,7 +187,10 @@ function valor_(v){
   return null;
 }
 
-// Teste manual no editor: Executar > testarConfiguracao (autoriza e confere a conta de serviço)
+// Teste manual no editor: Executar > testarConfiguracao (autoriza e confere o acesso ao Firestore)
 function testarConfiguracao(){
-  console.log('Token OAuth ok: ' + (tokenAcesso_().length > 20));
+  const r = UrlFetchApp.fetch('https://firestore.googleapis.com/v1/projects/' + PROJECT_ID + '/databases/(default)/documents/users?pageSize=1', {
+    muteHttpExceptions: true, headers: { Authorization: 'Bearer ' + tokenAcesso_() }
+  });
+  console.log('Firestore respondeu ' + r.getResponseCode() + (r.getResponseCode() === 200 ? ' — acesso ok' : ': ' + r.getContentText().slice(0, 300)));
 }
