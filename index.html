@@ -2719,7 +2719,15 @@ function demandMatchesFilters(d){
 
 
 
+// data de hoje no fuso do aparelho (AAAA-MM-DD) — toISOString usaria UTC e viraria o dia à noite no Brasil
+function hojeLocalISO(){
+  const n = new Date();
+  return n.getFullYear() + '-' + String(n.getMonth() + 1).padStart(2, '0') + '-' + String(n.getDate()).padStart(2, '0');
+}
+
 function createDemand(title, description, deadline, assignedToArr, priority, recurrenceFreq){
+  // prazo não pode ser anterior a hoje (o campo já bloqueia, aqui garante se alguém digitar à mão)
+  if(deadline && deadline < hojeLocalISO()){ alert('O prazo não pode ser uma data que já passou. Escolha hoje ou uma data futura.'); return; }
   const targets = assignedToArr.map(uid => allUsers.find(u => u.uid === uid)).filter(Boolean);
   const now = firebase.firestore.FieldValue.serverTimestamp();
   db.collection('demands').add({
@@ -2743,6 +2751,7 @@ function createDemand(title, description, deadline, assignedToArr, priority, rec
     recurrence: recurrenceFreq ? { freq: recurrenceFreq } : null
   }).then(ref => {
     logActivity('abriu uma demanda', title.trim());
+    if(typeof pushNotifyDemand === 'function') pushNotifyDemand(ref.id);   // aviso com o app fechado para quem recebeu
     // abre a demanda recém-criada (se ainda não chegou na lista, volta para a lista)
     demandView = myDemands.find(x => x.id === ref.id) ? { type: 'detail', id: ref.id } : 'list';
     renderDemandModal();
@@ -4585,7 +4594,7 @@ function renderNewDemandForm(main){
       <div class="field"><label class="f-label" for="demandTitle">Título</label><input id="demandTitle" class="f-input" type="text" placeholder="Ex.: Conferir estoque de mesas" maxlength="80" /></div>
       <div class="field"><label class="f-label" for="demandDesc">Descrição</label><textarea id="demandDesc" class="f-input" placeholder="Descreva a necessidade" rows="4"></textarea></div>
       <div class="field-row">
-        <div class="field"><label class="f-label" for="demandDeadline">Prazo</label><input id="demandDeadline" class="f-input" type="date" /></div>
+        <div class="field"><label class="f-label" for="demandDeadline">Prazo</label><input id="demandDeadline" class="f-input" type="date" min="${hojeLocalISO()}" /></div>
         <div class="field"><label class="f-label" for="demandPriority">Prioridade</label>
           <select id="demandPriority" class="f-input">
             <option value="baixa">Baixa</option>
@@ -4623,6 +4632,7 @@ function renderNewDemandForm(main){
     const freq = byId('demandRecurrenceFreq').value;
     if(!assignedTo.length){ alert('Selecione pelo menos uma pessoa.'); return; }
     if(!title.trim() || !desc.trim()){ alert('Preencha título e descrição.'); return; }
+    if(deadline && deadline < hojeLocalISO()){ alert('O prazo não pode ser uma data que já passou. Escolha hoje ou uma data futura.'); byId('demandDeadline').focus(); return; }
     createDemand(title, desc, deadline, assignedTo, priority, recurring ? freq : null);
   };
   if(!isMobile()) byId('demandTitle').focus();
@@ -5277,6 +5287,11 @@ function pushSetupSoon(){ clearTimeout(pushTimer); pushTimer = setTimeout(pushSe
 function pushNotifyMessage(convId){
   if(!pushConfigured()) return;
   pushCall({ action: 'msg', convId }).catch(() => {});
+}
+// demanda nova: o servidor (Apps Script, action 'demanda') manda o push para quem foi marcado
+function pushNotifyDemand(demandId){
+  if(!pushConfigured()) return;
+  pushCall({ action: 'demanda', demandId }).catch(() => {});
 }
 // ao sair, tira este aparelho da lista (para o próximo usuário do mesmo celular não receber os avisos do anterior)
 function pushUnregisterAndSignOut(){

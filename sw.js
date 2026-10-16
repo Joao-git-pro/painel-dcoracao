@@ -10,7 +10,7 @@
 // - NÃO mexe nas requisições do Firestore/login (essas passam direto).
 // Ao mudar este arquivo, troque a VERSAO para os aparelhos atualizarem o cache.
 // =====================================================================
-const VERSAO = '2026-10-14-v8';
+const VERSAO = '2026-10-16-v9';
 const CACHE = 'painel-dc-' + VERSAO;
 const BASE = self.registration.scope;               // ex.: https://dcoracaohome.netlify.app/
 const CASCA = ['./', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png',
@@ -132,7 +132,8 @@ self.addEventListener('notificationclick', event => {
         return;
       }
     }
-    const destino = new URL(data.convId ? './?conv=' + encodeURIComponent(data.convId) : './', BASE).href;
+    const destino = new URL(data.convId ? './?conv=' + encodeURIComponent(data.convId)
+      : (data.section ? './?s=' + encodeURIComponent(data.section) : './'), BASE).href;
     await self.clients.openWindow(destino);
   })());
 });
