@@ -9,5 +9,5 @@ window.PUSH_CONFIG = {
   // Certificados push da Web > "Par de chaves" (começa com B...)
   vapidKey: 'BGdaF7AcAcC4wZ64krZLfmtrTcOg9Hq2oWAiTuixL1P2RGzNgh3v8IMXWxDxNgzu7WLVTOoyxv1O8mnNCMkz1cg',
   // Apps Script > Implantar > Aplicativo da Web > URL (termina com /exec)
-  scriptUrl: ''
+  scriptUrl: 'https://script.google.com/macros/s/AKfycby6CJwX-eqivZ2gcggTZzERs7zuWsywpgl61i0AfDlzlaMDlDmad6cyB7-sOaPhI_3X/exec'
 };
