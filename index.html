@@ -926,6 +926,42 @@
     --in-bg:#42352a; --in-solid:#42352a; --in-ink:#fff6ec; --in-meta:#d9c8b6; --link:#f2c999;
   }
   .bubble{font-size:15.5px;}
+
+  /* =================================================================
+     REQUISIÇÃO DE INSUMOS (almoxarifado) — usa as variáveis do tema
+     ================================================================= */
+  .pill.st-aprovada{background:rgba(138,100,73,.16); color:var(--accent-strong);}
+  .pill.st-separada{background:rgba(120,90,200,.15); color:#6a4fc0;}
+  html[data-mode="dark"] .pill.st-separada{color:#b9a6f5;}
+  .pill.on{background:var(--accent); color:var(--accent-ink);}
+  .req-disp{font-size:12px; font-weight:800; padding:2px 8px; border-radius:999px; background:var(--surface-2); color:var(--ink); white-space:nowrap;}
+  .req-disp.low{background:rgba(193,80,61,.14); color:var(--danger);}
+  .req-steps{display:flex; flex-wrap:wrap; gap:6px; margin:4px 0 2px;}
+  .req-table{width:100%; border-collapse:collapse; font-size:13.5px; background:var(--surface); border:1px solid var(--line); border-radius:12px; overflow:hidden;}
+  .req-table th{font-size:11.5px; text-align:left; color:var(--ink-soft); padding:8px 10px; text-transform:uppercase; letter-spacing:.04em; background:var(--surface-2);}
+  .req-table td{padding:8px 10px; border-top:1px solid var(--line); vertical-align:middle;}
+  .req-table td.n, .req-table th.n{text-align:right;}
+  .req-table .f-input{width:84px; padding:6px 8px;}
+  .req-scroll{overflow-x:auto;}
+  .req-cart-row{display:flex; align-items:center; gap:10px; padding:10px 12px; border-bottom:1px solid var(--line);}
+  .req-cart-row:last-child{border-bottom:0;}
+  .req-cart-row .rc-main{flex:1; min-width:0;}
+  .rc-name{font-size:14.5px; font-weight:600;}
+  .rc-sub{font-size:12px; color:var(--ink-soft);}
+  .rc-qty{width:82px !important; flex-shrink:0;}
+  .rc-un{font-size:12.5px; color:var(--ink-soft); min-width:28px;}
+  .req-hist-row{font-size:12.5px; color:var(--ink-soft); padding:3px 0;}
+  .req-bar{height:12px; border-radius:6px; background:var(--surface-2); overflow:hidden;}
+  .req-bar > i{display:block; height:100%; background:var(--accent); border-radius:6px;}
+  .req-bar > i.sel{background:var(--ink);}
+  .req-bar-row{display:flex; flex-direction:column; gap:5px; padding:6px 0; cursor:pointer;}
+  .req-bar-top{display:flex; justify-content:space-between; font-size:14px;}
+  .req-acts{display:flex; flex-wrap:wrap; gap:8px; margin-top:6px;}
+  .req-note{font-size:12.5px; color:var(--ink-soft); line-height:1.5;}
+  .req-err{font-size:13px; font-weight:700; color:var(--danger); border-left:4px solid var(--danger); padding-left:10px;}
+  .req-foto{width:64px; height:64px; border-radius:10px; object-fit:cover; background:var(--surface-2); flex-shrink:0;}
+  #reqSetorBox{padding:6px 0 2px;}
+  #reqSetorBox select{width:100%;}
 </style>
 </head>
 <body>
@@ -978,6 +1014,14 @@
           <span class="rail-badge" id="demandBadge" style="display:none;">0</span>
         </span>
         <span class="rail-label">Demandas</span>
+      </button>
+
+      <button class="rail-btn" data-section="requisicao" id="railReqBtn" title="Requisição de insumos">
+        <span class="rail-ico">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+          <span class="rail-badge" id="reqBadge" style="display:none;">0</span>
+        </span>
+        <span class="rail-label">Requisição</span>
       </button>
 
       <button class="rail-btn hidden" data-section="admin" id="railAdminBtn" title="Administração">
@@ -1229,6 +1273,7 @@ auth.onAuthStateChanged(async user => {
     if(unsubDemandsCreated) unsubDemandsCreated();
     if(unsubDemandsAssigned) unsubDemandsAssigned();
     if(unsubDemandUpdates) unsubDemandUpdates();
+    stopRequisicao();
     Object.values(linkUnsubs).forEach(u => u());
     linkUnsubs = {};
     // limpa a interface para o próximo login
@@ -1323,6 +1368,7 @@ auth.onAuthStateChanged(async user => {
   listenConversations();
   listenDemands();
   listenCategories();
+  listenRequisicao();
   startPresence();
 });
 
@@ -3622,6 +3668,10 @@ function closeMainView(){
     renderAdminList();
   } else if(section === 'settings'){
     renderSettingsList();
+  } else if(section === 'requisicao'){
+    reqView = null;
+    renderReqList();
+    renderEmptyMain();
   }
   applyShell();
 }
@@ -3641,7 +3691,7 @@ function goSection(s){
   const changed = section !== s;
   section = s;
   mainOpen = false;
-  if(isMobile()){ chatView = null; demandView = null; editingMsgId = null; }
+  if(isMobile()){ chatView = null; demandView = null; editingMsgId = null; if(s !== 'requisicao') reqView = null; }
   if(s === 'chats'){ chatSidebarMode = 'list'; ensureNotificationPermission(); }
   if(s === 'demands' && changed && getMyOverdueDemands().length) playAlertSound();
   renderSection();
@@ -3657,6 +3707,7 @@ function renderSection(){
   else if(section === 'demands'){ renderDemandsList(); renderDemandModal(); }
   else if(section === 'admin'){ renderAdminList(); renderAdminMain(); }
   else if(section === 'settings'){ renderSettingsList(); renderSettingsMain(); }
+  else if(section === 'requisicao'){ renderReqList(); renderReqMain(); }
   updateSheetsDot();
   updateInstallBanner();
   applyShell();
@@ -3680,7 +3731,8 @@ function renderEmptyMain(){
     chats: ['Suas conversas', 'Escolha uma conversa na lista ou comece uma nova para falar com alguém da equipe.'],
     demands: ['Demandas', 'Selecione uma demanda para ver detalhes, checklist e atualizações — ou abra uma nova.'],
     admin: ['Administração', 'Use a lista ao lado para convidar pessoas, gerenciar acessos e ver a atividade.'],
-    settings: ['Ajustes', 'Escolha uma opção na lista ao lado.']
+    settings: ['Ajustes', 'Escolha uma opção na lista ao lado.'],
+    requisicao: ['Requisição de insumos', 'Escolha uma requisição na lista ou toque em + para pedir insumos ao almoxarifado.']
   }[section] || ['D Coração Home', ''];
   main.innerHTML = `
     <div class="empty-main">
@@ -3763,6 +3815,17 @@ function buildSidebar(){
   else if(section === 'settings'){
     head.innerHTML = sideHeadHtml('Ajustes', []);
     tools.innerHTML = '';
+  }
+  else if(section === 'requisicao'){
+    head.innerHTML = sideHeadHtml('Requisição', [
+      { id: 'reqNewBtn', icon: plusSvg, title: 'Nova requisição', primary: true },
+      { id: 'reqMenuBtn', icon: moreSvg, title: 'Mais opções' }
+    ]);
+    tools.innerHTML = searchBoxHtml('reqSearchInput', 'Buscar requisição ou produto…', reqSearch) + '<div class="chips" id="sideChips"></div><div class="chips" id="sideChips2"></div><div id="reqSetorBox"></div>';
+    byId('reqNewBtn').onclick = reqStartNew;
+    byId('reqMenuBtn').onclick = e => openMenu(e.currentTarget, reqMenuItems());
+    byId('reqSearchInput').oninput = e => { reqSearch = e.target.value.trim().toLowerCase(); renderReqList(); };
+    setFab(plusSvg, 'Nova requisição', reqStartNew);
   }
 }
 
@@ -4902,6 +4965,7 @@ function renderAdminList(){
     { id: 'users', label: 'Gerenciar usuários', sub: 'Bloquear, redefinir senha, tornar admin', icon: usersSvg, fn: showManageUsersModal },
     { id: 'groups', label: 'Grupos de acesso', sub: 'Liberar abas para grupos inteiros', icon: shieldSvg, fn: showGroupsModal },
     { id: 'newcat', label: 'Nova aba de planilhas', sub: 'Criar uma categoria de links', icon: folderPlusSvg, fn: showAddCategoryModal },
+    { id: 'setores', label: 'Setores e centros de custo', sub: 'Lista única usada em todo o painel', icon: reqBoxSvg, fn: showSetoresModal },
     { id: 'activity', label: 'Atividade recente', sub: 'Quem fez o quê e quando', icon: activitySvg, fn: showActivityModal },
     { id: 'lockall', label: 'Restringir todas as abas', sub: 'Abas sem restrição passam a ser só de admin', icon: shieldSvg, fn: restringirTodasAbas },
     { id: 'backup', label: 'Backup', sub: 'Baixar ou restaurar abas, links e pessoas', icon: downloadSvg, fn: showBackupModal }
@@ -5223,7 +5287,7 @@ function consumeDeepLink(){
     return;
   }
   pendingDeepLink = null; clearDeepLinkUrl();
-  if(['sheets', 'chats', 'demands', 'admin', 'settings'].includes(dl.section) && dl.section !== section) goSection(dl.section);
+  if(['sheets', 'chats', 'demands', 'requisicao', 'admin', 'settings'].includes(dl.section) && dl.section !== section) goSection(dl.section);
 }
 
 
@@ -5375,6 +5439,1051 @@ initShell();
 
 function escapeHtml(str){ const div = document.createElement('div'); div.textContent = str; return div.innerHTML; }
 function escapeAttr(str){ return String(str).replace(/"/g,'&quot;'); }
+
+
+// =====================================================================
+// REQUISIÇÃO DE INSUMOS (almoxarifado)
+// Coleções novas no Firestore: almox_produtos, almox_requisicoes,
+// almox_movimentos e almox_config (documentos "geral" e "contador").
+// Veja regras-requisicao.txt para as regras de segurança dessas coleções.
+// =====================================================================
+const reqBoxSvg = ic('<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line>');
+const reqCartSvg = ic('<circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 1.99-1.61L23 6H6"></path>');
+
+const REQ_STATUS = {
+  aberta: { label: 'Aberta', cls: 'st-aberta' },
+  em_analise: { label: 'Em análise', cls: 'st-em_andamento' },
+  aprovada: { label: 'Aprovada', cls: 'st-aprovada' },
+  separada: { label: 'Separada', cls: 'st-separada' },
+  entregue: { label: 'Entregue', cls: 'st-concluida' },
+  recusada: { label: 'Recusada', cls: 'st-cancelada' },
+  cancelada: { label: 'Cancelada', cls: 'st-cancelada' }
+};
+const REQ_FLOW = ['aberta', 'em_analise', 'aprovada', 'separada', 'entregue'];
+const REQ_UNITS = ['un', 'cx', 'pct', 'rolo', 'kg', 'm', 'l'];
+const REQ_SETORES_PADRAO = [{ nome: 'Produção', cc: '' }, { nome: 'Expedição', cc: '' }, { nome: 'Escritório', cc: '' }, { nome: 'Manutenção', cc: '' }];
+const REQ_TIPOS = { entrada: 'Entrada', saida: 'Saída', ajuste: 'Ajuste', devolucao: 'Devolução' };
+
+let reqProducts = [], reqList = [], reqMoves = [];
+let reqCfg = { uids: [] };
+// Setores/centros de custo: cadastro único do painel (config/setores), só o administrador altera
+let appSetores = null, appSetorUsers = {}, unsubSetores = null;
+let unsubReqC = null, unsubReqP = null, unsubReqR = null, unsubReqM = null;
+let reqAlmoxMode = null;
+let reqMode = 'fila';            // fila | catalogo | estoque | relatorio
+let reqView = null;              // null | {type:'req',id} | {type:'cart'} | {type:'prod',id} | {type:'prodform',id} | {type:'rel'}
+let reqCart = [];                // [{id, qty}]
+let reqForm = { setor: '', urgencia: 'normal', just: '', erro: '' };
+let reqSearch = '', reqStatusFilter = '', reqSetorFilter = '', reqPeriod = 'mes';
+let reqAprov = {};
+let reqFirst = { p: true, r: true };
+let reqStatusCache = {}, reqDispCache = {};
+let reqMainSig = '';
+
+function isAlmox(){ return isAdmin || (reqCfg.uids || []).includes(myUid); }
+function reqMySetor(){ return isAlmox() ? '' : (appSetorUsers[myUid] || ''); }
+function reqSetores(){ return (appSetores && appSetores.length) ? appSetores : REQ_SETORES_PADRAO; }
+function reqProd(id){ return reqProducts.find(p => p.id === id); }
+function reqDisp(p){ return (p.saldo || 0) - (p.reservado || 0); }
+function reqLow(p){ return p.ativo !== false && reqDisp(p) < (p.estoqueMin || 0); }
+function reqNum(n){ return 'REQ-' + String(n || 0).padStart(4, '0'); }
+function reqMoney(v){ return (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
+function reqMyName(){ return myChatName || (auth.currentUser && auth.currentUser.email) || 'Alguém'; }
+function reqErr(e){ return (e && e.message) ? e.message : 'Não foi possível concluir. Tente de novo.'; }
+function reqSeenGet(){ try{ return JSON.parse(localStorage.getItem('dc_req_seen') || '{}'); }catch(e){ return {}; } }
+function reqSeenSet(id, st){ const s = reqSeenGet(); if(s[id] === st) return; s[id] = st; try{ localStorage.setItem('dc_req_seen', JSON.stringify(s)); }catch(e){} }
+function reqStamp(status){
+  return {
+    atualizadoEm: firebase.firestore.FieldValue.serverTimestamp(),
+    atualizadoPor: myUid,
+    historico: firebase.firestore.FieldValue.arrayUnion({ status, por: reqMyName(), em: Date.now() })
+  };
+}
+function reqPill(status){ const s = REQ_STATUS[status] || { label: status, cls: '' }; return `<span class="pill ${s.cls}">${escapeHtml(s.label)}</span>`; }
+
+// ---------- OUVINTES ----------
+function listenRequisicao(){
+  stopRequisicao();
+  reqFirst = { p: true, r: true };
+  unsubReqC = db.collection('almox_config').doc('geral').onSnapshot(doc => {
+    const d = doc.data() || {};
+    reqCfg = { uids: Array.isArray(d.uids) ? d.uids : [] };
+    reqEnsureData();
+    reqRefresh();
+  }, err => reportListenError('almoxarifado (configuração)', err));
+  unsubSetores = db.collection('config').doc('setores').onSnapshot(doc => {
+    const d = doc.data() || {};
+    appSetores = Array.isArray(d.lista) ? d.lista : null;
+    appSetorUsers = d.porUsuario || {};
+    reqEnsureData();
+    reqRefresh();
+  }, err => reportListenError('setores', err));
+  unsubReqP = db.collection('almox_produtos').onSnapshot(snap => {
+    reqProducts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    if(!reqFirst.p && isAlmox()){
+      reqProducts.forEach(p => {
+        const was = reqDispCache[p.id];
+        if(was !== undefined && was >= (p.estoqueMin || 0) && reqLow(p)){
+          reqAlert('Estoque abaixo do mínimo', `${p.descricao}: restam ${reqDisp(p)} ${p.unidade || ''} (mínimo ${p.estoqueMin || 0})`, null);
+        }
+      });
+    }
+    reqDispCache = {};
+    reqProducts.forEach(p => { reqDispCache[p.id] = reqDisp(p); });
+    reqFirst.p = false;
+    reqRefresh();
+  }, err => reportListenError('almoxarifado (produtos)', err));
+  reqEnsureData();
+}
+
+function reqEnsureData(){
+  const m = isAlmox();
+  const modeKey = m + '|' + reqMySetor();
+  if(reqAlmoxMode === modeKey) return;
+  reqAlmoxMode = modeKey;
+  if(unsubReqR){ unsubReqR(); unsubReqR = null; }
+  if(unsubReqM){ unsubReqM(); unsubReqM = null; }
+  reqFirst.r = true;
+  const q = m
+    ? db.collection('almox_requisicoes').orderBy('criadoEm', 'desc').limit(400)
+    : (reqMySetor()
+        ? db.collection('almox_requisicoes').where('setor', '==', reqMySetor())
+        : db.collection('almox_requisicoes').where('criadoPor', '==', myUid));
+  unsubReqR = q.onSnapshot(snap => {
+    reqList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    if(!reqFirst.r){
+      snap.docChanges().forEach(ch => {
+        if(ch.doc.metadata.hasPendingWrites) return;
+        const r = { id: ch.doc.id, ...ch.doc.data() };
+        if(ch.type === 'added' && m && r.criadoPor !== myUid){
+          reqAlert('Nova requisição ' + reqNum(r.numero), `${r.setor}${r.urgencia === 'urgente' ? ' · URGENTE' : ''} · ${(r.itens || []).length} item(ns)`, r.id);
+        } else if(ch.type === 'modified'){
+          const prev = reqStatusCache[r.id];
+          if(prev && prev !== r.status && r.atualizadoPor !== myUid){
+            if(r.criadoPor === myUid){
+              const txt = {
+                aprovada: 'Aprovada. A quantidade foi reservada para o seu setor.',
+                separada: 'Separada. Pode retirar no almoxarifado.',
+                entregue: 'Entregue.',
+                recusada: 'Recusada' + (r.motivo ? ': ' + r.motivo : '.'),
+                em_analise: 'O almoxarifado começou a analisar.'
+              }[r.status];
+              if(txt) reqAlert(reqNum(r.numero), txt, r.id);
+            } else if(m && r.status === 'cancelada'){
+              reqAlert(reqNum(r.numero) + ' cancelada', 'Cancelada pelo solicitante (' + (r.criadoPorNome || '—') + ').', r.id);
+            }
+          }
+        }
+      });
+    }
+    reqStatusCache = {};
+    reqList.forEach(r => { reqStatusCache[r.id] = r.status; });
+    reqFirst.r = false;
+    reqRefresh();
+  }, err => reportListenError('requisições', err));
+  if(m){
+    unsubReqM = db.collection('almox_movimentos').orderBy('data', 'desc').limit(500).onSnapshot(snap => {
+      reqMoves = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      reqRefresh();
+    }, err => reportListenError('movimentações do almoxarifado', err));
+  }
+}
+
+function stopRequisicao(){
+  [unsubReqC, unsubReqP, unsubReqR, unsubReqM, unsubSetores].forEach(u => { if(u) u(); });
+  unsubReqC = unsubReqP = unsubReqR = unsubReqM = unsubSetores = null; appSetores = null; appSetorUsers = {};
+  reqProducts = []; reqList = []; reqMoves = []; reqCfg = { uids: [] };
+  reqAlmoxMode = null; reqView = null; reqCart = []; reqMode = 'fila';
+  reqStatusCache = {}; reqDispCache = {}; reqAprov = {};
+  const b = byId('reqBadge'); if(b) b.style.display = 'none';
+}
+
+function reqUpdateBadge(){
+  const b = byId('reqBadge'); if(!b) return;
+  let n = 0;
+  if(isAlmox()) n = reqList.filter(r => r.status === 'aberta').length;
+  else {
+    const seen = reqSeenGet();
+    n = reqList.filter(r => r.criadoPor === myUid && ['aprovada', 'separada', 'entregue', 'recusada'].includes(r.status) && seen[r.id] !== r.status).length;
+  }
+  if(n > 0){ b.style.display = 'inline-block'; b.textContent = n > 99 ? '99+' : n; } else b.style.display = 'none';
+}
+
+function reqRefresh(){
+  reqUpdateBadge();
+  if(section !== 'requisicao' || !byId('sideList')) return;
+  renderReqList();
+  if(!reqView) return;
+  if(['req', 'prod', 'rel'].includes(reqView.type)){
+    const sig = JSON.stringify([reqView, reqList, reqProducts, reqMoves, reqPeriod, reqSetorFilter, isAlmox()]);
+    if(sig !== reqMainSig) renderReqMain();
+  }
+}
+
+// ---------- ALERTAS (aviso na tela + notificação do sistema + som) ----------
+function reqAlert(titulo, texto, reqId){
+  try{ if(soundsOn()) playMessageSound(); }catch(e){}
+  const container = byId('msnToastContainer');
+  if(container){
+    while(container.children.length >= 4) container.removeChild(container.firstChild);
+    const toast = document.createElement('div');
+    toast.className = 'msn-toast';
+    toast.innerHTML = `
+      <div class="msn-avatar">${reqBoxSvg}</div>
+      <div class="msn-body"><div class="msn-name">${escapeHtml(titulo)}</div><div class="msn-text">${escapeHtml(texto)}</div></div>
+      <button class="msn-close" title="Fechar">✕</button>`;
+    const remove = () => { toast.classList.add('leaving'); setTimeout(() => toast.remove(), 260); };
+    toast.querySelector('.msn-close').onclick = e => { e.stopPropagation(); remove(); };
+    toast.onclick = () => {
+      remove();
+      reqMode = reqId ? 'fila' : 'estoque';
+      goSection('requisicao');
+      if(reqId) openReq(reqId);
+    };
+    container.appendChild(toast);
+    setTimeout(remove, 7000);
+  }
+  if('Notification' in window && Notification.permission === 'granted' && document.visibilityState !== 'visible'){
+    const opts = { body: texto, tag: 'req-' + (reqId || 'estoque'), renotify: true, icon: 'icons/icon-192.png', badge: 'icons/badge-96.png', data: { section: 'requisicao' } };
+    try{
+      if(swReg && swReg.showNotification) swReg.showNotification(titulo, opts).catch(() => {});
+      else new Notification(titulo, opts);
+    }catch(e){}
+  }
+}
+// push com o app fechado: o servidor (Apps Script) precisa tratar a ação 'requisicao'
+function reqPushNotify(reqId, evento){
+  if(typeof pushConfigured === 'function' && pushConfigured()) pushCall({ action: 'requisicao', reqId, evento }).catch(() => {});
+}
+
+// ---------- BARRA LATERAL ----------
+function reqMenuItems(){
+  const items = [];
+  if(isAlmox()){
+    items.push({ label: 'Novo produto', icon: plusSvg, action: () => openReqProdForm(null) });
+    items.push({ label: 'Importar da planilha', icon: downloadSvg, action: showReqImportModal });
+    items.push({ label: 'Imprimir relatório por setor', icon: printSvg, action: printReqReport });
+  }
+  if(isAdmin){
+    items.push({ label: 'Quem atende as requisições', icon: shieldSvg, action: showReqConfigModal });
+    items.push({ label: 'Setores e centros de custo', icon: reqBoxSvg, action: showSetoresModal });
+  }
+  if('Notification' in window && Notification.permission === 'default'){
+    items.push({ label: 'Ativar notificações', icon: bellSvg, action: () => { try{ Notification.requestPermission().then(pushSetupSoon); }catch(e){} } });
+  }
+  return items.length ? items : [{ label: 'Nova requisição', icon: plusSvg, action: reqStartNew }];
+}
+
+function reqStartNew(){
+  reqMode = 'catalogo';
+  reqView = { type: 'cart' };
+  openMain();
+  renderReqList();
+  renderReqMain();
+}
+
+function renderReqChips(){
+  const box = byId('sideChips'); if(!box) return;
+  const modes = [['fila', 'Requisições'], ['catalogo', 'Catálogo']];
+  if(isAlmox()){ modes.push(['estoque', 'Estoque']); modes.push(['relatorio', 'Relatório']); }
+  if(!modes.some(m => m[0] === reqMode)) reqMode = 'fila';
+  box.innerHTML = modes.map(([k, l]) => `<button class="chip${reqMode === k ? ' on' : ''}" data-m="${k}">${l}${k === 'catalogo' && reqCart.length ? ' · ' + reqCart.length : ''}</button>`).join('');
+  box.querySelectorAll('[data-m]').forEach(b => { b.onclick = () => {
+    reqMode = b.getAttribute('data-m');
+    reqView = reqMode === 'catalogo' ? { type: 'cart' } : (reqMode === 'relatorio' ? { type: 'rel' } : null);
+    renderReqList(); renderReqMain();
+  }; });
+  const box2 = byId('sideChips2');
+  if(box2){
+    if(reqMode === 'fila'){
+      const st = [['', 'Todas'], ['aberta', 'Abertas'], ['em_analise', 'Em análise'], ['aprovada', 'Aprovadas'], ['separada', 'Separadas'], ['entregue', 'Entregues'], ['encerradas', 'Encerradas']];
+      box2.innerHTML = st.map(([k, l]) => `<button class="chip${reqStatusFilter === k ? ' on' : ''}" data-st="${k}">${l}</button>`).join('');
+      box2.querySelectorAll('[data-st]').forEach(b => { b.onclick = () => { reqStatusFilter = b.getAttribute('data-st'); renderReqList(); }; });
+    } else box2.innerHTML = '';
+  }
+  const sb = byId('reqSetorBox');
+  if(sb){
+    if(isAlmox() && reqMode === 'fila'){
+      sb.innerHTML = `<select id="reqSetorSel" class="f-input" aria-label="Filtrar por setor"><option value="">Todos os setores</option>${reqSetores().map(s => `<option value="${escapeAttr(s.nome)}"${reqSetorFilter === s.nome ? ' selected' : ''}>${escapeHtml(s.nome)}</option>`).join('')}</select>`;
+      byId('reqSetorSel').onchange = e => { reqSetorFilter = e.target.value; renderReqList(); if(reqView && reqView.type === 'rel') renderReqMain(); };
+    } else sb.innerHTML = '';
+  }
+}
+
+function reqVisible(){
+  const q = reqSearch;
+  const open = ['aberta', 'em_analise'];
+  return reqList.filter(r => {
+    if(reqSetorFilter && r.setor !== reqSetorFilter) return false;
+    if(reqStatusFilter === 'encerradas'){ if(!['recusada', 'cancelada'].includes(r.status)) return false; }
+    else if(reqStatusFilter && r.status !== reqStatusFilter) return false;
+    if(q && !(reqNum(r.numero) + ' ' + r.setor + ' ' + (r.criadoPorNome || '') + ' ' + (r.itens || []).map(i => i.descricao).join(' ')).toLowerCase().includes(q)) return false;
+    return true;
+  }).sort((a, b) => {
+    const pa = (open.includes(a.status) && a.urgencia === 'urgente') ? 0 : 1;
+    const pb = (open.includes(b.status) && b.urgencia === 'urgente') ? 0 : 1;
+    if(pa !== pb) return pa - pb;
+    return (tsMs(b.criadoEm) || Date.now()) - (tsMs(a.criadoEm) || Date.now());
+  });
+}
+
+function reqFilaHtml(){
+  const rows = reqVisible();
+  if(!rows.length) return `<div class="list-empty">${isAlmox() ? 'Nenhuma requisição encontrada.' : 'Você ainda não fez requisições.<br>Toque em + para pedir insumos ao almoxarifado.'}</div>`;
+  return rows.map(r => {
+    const active = reqView && reqView.type === 'req' && reqView.id === r.id && (!isMobile() || mainOpen);
+    const t = tsMs(r.criadoEm) || Date.now();
+    return `<div class="row${active ? ' active' : ''}" role="button" tabindex="0" data-req-open="${escapeAttr(r.id)}">
+      <div class="row-ico${r.urgencia === 'urgente' && ['aberta', 'em_analise'].includes(r.status) ? ' danger' : ''}">${reqBoxSvg}</div>
+      <div class="row-main">
+        <div class="row-top"><span class="row-title"><span>${escapeHtml(reqNum(r.numero))} · ${escapeHtml(r.setor || '')}</span></span><span class="row-time">${escapeHtml(listTime(t))}</span></div>
+        <div class="row-bottom"><span class="row-sub"><span class="sub-txt">${(r.itens || []).length} item(ns) · ${escapeHtml(r.criadoPorNome || '—')}</span></span></div>
+        <div class="row-tags">${reqPill(r.status)}${r.urgencia === 'urgente' ? '<span class="pill danger">URGENTE</span>' : ''}</div>
+      </div></div>`;
+  }).join('');
+}
+
+function reqCatalogHtml(){
+  const q = reqSearch;
+  const prods = reqProducts.filter(p => p.ativo !== false && (!q || ((p.codigo || '') + ' ' + (p.descricao || '') + ' ' + (p.categoria || '')).toLowerCase().includes(q)))
+    .sort((a, b) => (a.categoria || '').localeCompare(b.categoria || '') || (a.descricao || '').localeCompare(b.descricao || ''));
+  if(!prods.length) return `<div class="list-empty">${reqProducts.length ? 'Nenhum produto encontrado.' : 'Nenhum produto cadastrado ainda.'}</div>`;
+  let cat = null, html = '';
+  prods.forEach(p => {
+    if((p.categoria || 'Sem categoria') !== cat){ cat = p.categoria || 'Sem categoria'; html += `<div class="list-section">${escapeHtml(cat)}</div>`; }
+    const inCart = reqCart.find(c => c.id === p.id);
+    html += `<div class="row" role="button" tabindex="0" data-req-add="${escapeAttr(p.id)}">
+      ${p.foto ? `<img class="req-foto" src="${escapeAttr(p.foto)}" alt="" style="width:42px;height:42px;">` : `<div class="row-ico">${reqBoxSvg}</div>`}
+      <div class="row-main">
+        <div class="row-top"><span class="row-title"><span>${escapeHtml(p.descricao || '')}</span></span><span class="req-disp${reqLow(p) ? ' low' : ''}">${reqDisp(p)} ${escapeHtml(p.unidade || '')}</span></div>
+        <div class="row-bottom"><span class="row-sub"><span class="sub-txt">${escapeHtml(p.codigo || '')}${p.localizacao ? ' · ' + escapeHtml(p.localizacao) : ''}${inCart ? ' · na requisição: ' + inCart.qty : ''}</span></span></div>
+      </div></div>`;
+  });
+  return html;
+}
+
+function reqEstoqueHtml(){
+  const q = reqSearch;
+  const prods = reqProducts.filter(p => !q || ((p.codigo || '') + ' ' + (p.descricao || '') + ' ' + (p.categoria || '')).toLowerCase().includes(q))
+    .sort((a, b) => (reqLow(b) ? 1 : 0) - (reqLow(a) ? 1 : 0) || (a.descricao || '').localeCompare(b.descricao || ''));
+  if(!prods.length) return '<div class="list-empty">Nenhum produto cadastrado. Use o menu ⋮ para criar o primeiro.</div>';
+  return prods.map(p => {
+    const active = reqView && reqView.type === 'prod' && reqView.id === p.id && (!isMobile() || mainOpen);
+    return `<div class="row${active ? ' active' : ''}" role="button" tabindex="0" data-req-prod="${escapeAttr(p.id)}">
+      <div class="row-ico${reqLow(p) ? ' danger' : ''}">${reqBoxSvg}</div>
+      <div class="row-main">
+        <div class="row-top"><span class="row-title"><span>${escapeHtml(p.descricao || '')}</span></span><span class="req-disp${reqLow(p) ? ' low' : ''}">${reqDisp(p)} ${escapeHtml(p.unidade || '')}</span></div>
+        <div class="row-bottom"><span class="row-sub"><span class="sub-txt">${escapeHtml(p.codigo || '')} · saldo ${p.saldo || 0} · reservado ${p.reservado || 0} · mín. ${p.estoqueMin || 0}</span></span></div>
+        ${p.ativo === false ? '<div class="row-tags"><span class="pill">Inativo</span></div>' : (reqLow(p) ? '<div class="row-tags"><span class="pill danger">Abaixo do mínimo</span></div>' : '')}
+      </div></div>`;
+  }).join('');
+}
+
+function reqRelSetoresHtml(){
+  const nomes = ['', ...reqSetores().map(s => s.nome)];
+  return nomes.map(n => `<div class="row${reqSetorFilter === n ? ' active' : ''}" role="button" tabindex="0" data-req-setor="${escapeAttr(n)}">
+    <div class="row-ico">${chartSvg}</div>
+    <div class="row-main"><div class="row-top"><span class="row-title"><span>${n ? escapeHtml(n) : 'Todos os setores'}</span></span></div></div></div>`).join('');
+}
+
+function renderReqList(){
+  if(section !== 'requisicao') return;
+  const list = byId('sideList'); if(!list) return;
+  const prev = list.scrollTop;
+  renderReqChips();
+  list.innerHTML = reqMode === 'fila' ? reqFilaHtml() : reqMode === 'catalogo' ? reqCatalogHtml() : reqMode === 'estoque' ? reqEstoqueHtml() : reqRelSetoresHtml();
+  list.querySelectorAll('[data-req-open]').forEach(r => onActivate(r, () => openReq(r.getAttribute('data-req-open'))));
+  list.querySelectorAll('[data-req-add]').forEach(r => onActivate(r, () => reqAddToCart(r.getAttribute('data-req-add'))));
+  list.querySelectorAll('[data-req-prod]').forEach(r => onActivate(r, () => openReqProd(r.getAttribute('data-req-prod'))));
+  list.querySelectorAll('[data-req-setor]').forEach(r => onActivate(r, () => {
+    reqSetorFilter = r.getAttribute('data-req-setor'); reqView = { type: 'rel' }; openMain(); renderReqList(); renderReqMain();
+  }));
+  list.scrollTop = prev;
+}
+
+// ---------- PAINEL PRINCIPAL ----------
+function renderReqMain(){
+  if(section !== 'requisicao') return;
+  const main = byId('mainPane'); if(!main) return;
+  reqMainSig = JSON.stringify([reqView, reqList, reqProducts, reqMoves, reqPeriod, reqSetorFilter, isAlmox()]);
+  mainKey = 'req:' + JSON.stringify(reqView);
+  if(!reqView){ renderEmptyMain(); return; }
+  if(reqView.type === 'cart') return renderReqCart(main);
+  if(reqView.type === 'req'){
+    const r = reqList.find(x => x.id === reqView.id);
+    if(!r){ reqView = null; renderEmptyMain(); return; }
+    return renderReqDetail(main, r);
+  }
+  if(reqView.type === 'prod'){
+    const p = reqProd(reqView.id);
+    if(!p){ reqView = null; renderEmptyMain(); return; }
+    return renderReqProd(main, p);
+  }
+  if(reqView.type === 'prodform') return renderReqProdForm(main, reqProd(reqView.id));
+  if(reqView.type === 'rel') return renderReqReport(main);
+}
+
+function reqHead(icon, title, sub, extra){
+  return `<div class="pane-head">
+    <button class="head-btn back-btn" id="reqBack" title="Voltar" aria-label="Voltar">${backSvg}</button>
+    <div class="row-ico" style="width:38px;height:38px;">${icon}</div>
+    <div class="pane-titles"><div class="pane-title"><span style="overflow:hidden;text-overflow:ellipsis;">${escapeHtml(title)}</span></div><div class="pane-sub">${sub}</div></div>
+    ${extra || ''}</div>`;
+}
+function reqBindBack(){ const b = byId('reqBack'); if(b) b.onclick = goBack; }
+
+function openReq(id){
+  reqView = { type: 'req', id };
+  const r = reqList.find(x => x.id === id);
+  if(r && r.criadoPor === myUid) reqSeenSet(id, r.status);
+  openMain();
+  renderReqList();
+  renderReqMain();
+  reqUpdateBadge();
+}
+function openReqProd(id){ reqView = { type: 'prod', id }; openMain(); renderReqList(); renderReqMain(); }
+function openReqProdForm(id){ reqMode = 'estoque'; reqView = { type: 'prodform', id }; goSection('requisicao'); openMain(); renderReqList(); renderReqMain(); }
+
+// ----- carrinho / nova requisição -----
+function reqAddToCart(pid){
+  const p = reqProd(pid); if(!p) return;
+  const ex = reqCart.find(c => c.id === pid);
+  if(ex) ex.qty += 1; else reqCart.push({ id: pid, qty: 1 });
+  showSnack('Adicionado: ' + p.descricao);
+  reqView = { type: 'cart' };
+  renderReqList();
+  if(!isMobile() || mainOpen) renderReqMain();
+}
+
+function renderReqCart(main){
+  const fixo = reqMySetor();
+  if(fixo) reqForm.setor = fixo;
+  else if(!reqForm.setor || !reqSetores().some(s => s.nome === reqForm.setor)) reqForm.setor = getPref('dc_req_setor', '') || reqSetores()[0].nome;
+  const items = reqCart.map(c => ({ c, p: reqProd(c.id) })).filter(x => x.p);
+  main.innerHTML = reqHead(reqCartSvg, 'Nova requisição', `${items.length} item(ns) · o saldo só é reservado quando o almoxarifado aprovar`) + `
+    <div class="pane-body"><div class="form-pane">
+      ${items.length ? `<div class="card-list">${items.map(({ c, p }) => `
+        <div class="req-cart-row">
+          <div class="rc-main"><div class="rc-name">${escapeHtml(p.descricao)}</div><div class="rc-sub">${escapeHtml(p.codigo || '')} · disponível ${reqDisp(p)} ${escapeHtml(p.unidade || '')}</div></div>
+          <input type="number" min="1" step="1" class="f-input rc-qty" data-qid="${escapeAttr(p.id)}" value="${c.qty}" aria-label="Quantidade de ${escapeAttr(p.descricao)}" />
+          <span class="rc-un">${escapeHtml(p.unidade || '')}</span>
+          <button class="head-btn sm" data-rm="${escapeAttr(p.id)}" title="Remover" aria-label="Remover">${xSvg}</button>
+        </div>`).join('')}</div>`
+      : `<div class="list-empty">Nenhum item ainda.<br>${isMobile() ? 'Volte e toque' : 'Toque'} em um produto do catálogo para adicionar.</div>`}
+      <div class="field-row">
+        <div class="field"><label class="f-label" for="rqSetor">Setor (centro de custo)${fixo ? ' · definido pelo administrador' : ''}</label>
+          <select id="rqSetor" class="f-input"${fixo ? ' disabled' : ''}>${(fixo ? reqSetores().filter(x => x.nome === fixo) : reqSetores()).map(s => `<option value="${escapeAttr(s.nome)}"${s.nome === reqForm.setor ? ' selected' : ''}>${escapeHtml(s.nome)}${s.cc ? ' · ' + escapeHtml(s.cc) : ''}</option>`).join('')}</select></div>
+        <div class="field"><label class="f-label" for="rqUrg">Urgência</label>
+          <select id="rqUrg" class="f-input"><option value="normal"${reqForm.urgencia === 'normal' ? ' selected' : ''}>Normal</option><option value="urgente"${reqForm.urgencia === 'urgente' ? ' selected' : ''}>Urgente</option></select></div>
+      </div>
+      <div class="field"><label class="f-label" for="rqJust">Justificativa</label>
+        <textarea id="rqJust" class="f-input" rows="3" placeholder="Para que será usado?">${escapeHtml(reqForm.just)}</textarea></div>
+      <div class="req-err" id="rqErr" style="display:${reqForm.erro ? 'block' : 'none'}">${escapeHtml(reqForm.erro)}</div>
+      <div class="req-note">Se pedir mais do que há disponível, o almoxarifado pode aprovar só uma parte. A baixa no estoque acontece na entrega.</div>
+      <div class="form-actions"><button class="btn" id="rqClear" type="button">Limpar</button><button class="btn primary" id="rqSend" type="button">Enviar requisição</button></div>
+    </div></div>`;
+  reqBindBack();
+  main.querySelectorAll('[data-qid]').forEach(inp => { inp.oninput = () => {
+    const c = reqCart.find(x => x.id === inp.getAttribute('data-qid')); if(c) c.qty = Math.max(1, Math.floor(+inp.value || 1));
+    renderReqChips();
+  }; });
+  main.querySelectorAll('[data-rm]').forEach(b => { b.onclick = () => { reqCart = reqCart.filter(c => c.id !== b.getAttribute('data-rm')); renderReqList(); renderReqMain(); }; });
+  byId('rqSetor').onchange = e => { reqForm.setor = e.target.value; setPref('dc_req_setor', reqForm.setor); };
+  byId('rqUrg').onchange = e => { reqForm.urgencia = e.target.value; };
+  byId('rqJust').oninput = e => { reqForm.just = e.target.value; };
+  byId('rqClear').onclick = () => { reqCart = []; reqForm.just = ''; reqForm.erro = ''; renderReqList(); renderReqMain(); };
+  byId('rqSend').onclick = reqSubmit;
+}
+
+async function reqSubmit(){
+  const itens = reqCart.map(c => ({ c, p: reqProd(c.id) })).filter(x => x.p && x.c.qty > 0).map(({ c, p }) => ({
+    produtoId: p.id, codigo: p.codigo || '', descricao: p.descricao || '', unidade: p.unidade || '', pedido: c.qty, aprovada: 0, entregue: 0
+  }));
+  if(!itens.length){ reqForm.erro = 'Adicione ao menos um item.'; renderReqMain(); return; }
+  const setor = reqSetores().find(s => s.nome === reqForm.setor) || reqSetores()[0];
+  const btn = byId('rqSend'); if(btn) btn.disabled = true;
+  let newId = null;
+  try{
+    await db.runTransaction(async tx => {
+      const cref = db.collection('almox_config').doc('contador');
+      const cs = await tx.get(cref);
+      const n = (cs.exists && cs.data().proximo) || 1;
+      const rref = db.collection('almox_requisicoes').doc();
+      tx.set(cref, { proximo: n + 1 });
+      tx.set(rref, {
+        numero: n, status: 'aberta', setor: setor.nome, centroCusto: setor.cc || '', urgencia: reqForm.urgencia,
+        justificativa: (reqForm.just || '').trim(), itens, criadoPor: myUid, criadoPorNome: reqMyName(),
+        criadoEm: firebase.firestore.FieldValue.serverTimestamp(), atualizadoEm: firebase.firestore.FieldValue.serverTimestamp(),
+        atualizadoPor: myUid, historico: [{ status: 'aberta', por: reqMyName(), em: Date.now() }]
+      });
+      newId = rref.id;
+    });
+    reqCart = []; reqForm.just = ''; reqForm.erro = '';
+    reqPushNotify(newId, 'nova');
+    showSnack('Requisição enviada ao almoxarifado.');
+    reqMode = 'fila';
+    reqView = { type: 'req', id: newId };
+    renderReqList(); renderReqMain();
+  }catch(e){
+    reqForm.erro = reqErr(e); renderReqMain();
+  }
+}
+
+// ----- detalhe da requisição -----
+function renderReqDetail(main, r){
+  const almox = isAlmox();
+  const editing = almox && r.status === 'em_analise';
+  const idx = REQ_FLOW.indexOf(r.status);
+  const steps = idx >= 0 ? REQ_FLOW.map((s, k) => `<span class="pill${k <= idx ? ' on' : ''}">${REQ_STATUS[s].label}</span>`).join('') : reqPill(r.status);
+  const rows = (r.itens || []).map(it => {
+    const p = reqProd(it.produtoId); const disp = p ? reqDisp(p) : 0;
+    let ap;
+    if(editing){
+      const max = Math.max(0, Math.min(it.pedido, disp)); const key = r.id + '|' + it.produtoId;
+      const v = reqAprov[key] !== undefined ? reqAprov[key] : max;
+      ap = `<input type="number" class="f-input req-ap" min="0" max="${max}" data-pid="${escapeAttr(it.produtoId)}" value="${v}" aria-label="Quantidade a aprovar" />`;
+    } else ap = String(it.aprovada || 0);
+    return `<tr><td>${escapeHtml(it.descricao)}<div class="rc-sub">${escapeHtml(it.codigo || '')}</div></td>
+      <td class="n">${it.pedido} ${escapeHtml(it.unidade || '')}</td>${almox ? `<td class="n">${disp}</td>` : ''}
+      <td class="n">${ap}</td><td class="n">${it.entregue || 0}</td></tr>`;
+  }).join('');
+  const hist = (r.historico || []).slice().reverse().map(h => `<div class="req-hist-row"><b>${escapeHtml((REQ_STATUS[h.status] || { label: h.status }).label)}</b> · ${escapeHtml(h.por || '')} · ${escapeHtml(fmtDateTime(h.em))}</div>`).join('');
+  let acts = '';
+  if(almox && r.status === 'aberta') acts += '<button class="btn primary" id="rqIniciar" type="button">Iniciar análise</button>';
+  if(editing) acts += '<button class="btn" id="rqRecusar" type="button">Recusar</button><button class="btn primary" id="rqAprovar" type="button">Aprovar</button>';
+  if(almox && r.status === 'aprovada') acts += '<button class="btn primary" id="rqSeparar" type="button">Marcar como separada</button><button class="btn" id="rqLiberar" type="button">Cancelar e liberar reserva</button>';
+  if(almox && r.status === 'separada') acts += '<button class="btn primary" id="rqEntregar" type="button">Confirmar entrega e dar baixa</button>';
+  if(!almox && r.criadoPor === myUid && r.status === 'aberta') acts += '<button class="btn" id="rqCancelar" type="button">Cancelar requisição</button>';
+  const printBtn = almox ? `<button class="head-btn" id="rqPrint" title="Imprimir para assinatura" aria-label="Imprimir para assinatura">${printSvg}</button>` : '';
+  main.innerHTML = reqHead(reqBoxSvg, reqNum(r.numero) + ' · ' + (r.setor || ''), escapeHtml((REQ_STATUS[r.status] || { label: r.status }).label) + (r.urgencia === 'urgente' ? ' · URGENTE' : ''), printBtn) + `
+    <div class="pane-body"><div class="form-pane">
+      <div class="req-steps">${steps}</div>
+      <div class="req-note">Solicitante: <b>${escapeHtml(r.criadoPorNome || '—')}</b> · Centro de custo: <b>${escapeHtml(r.setor || '')}${r.centroCusto ? ' (' + escapeHtml(r.centroCusto) + ')' : ''}</b> · Aberta em ${escapeHtml(fmtDateTime(tsMs(r.criadoEm) || Date.now()))}</div>
+      ${r.justificativa ? `<div class="req-note"><b>Justificativa:</b> ${escapeHtml(r.justificativa)}</div>` : ''}
+      ${r.status === 'recusada' && r.motivo ? `<div class="req-err">Recusada: ${escapeHtml(r.motivo)}</div>` : ''}
+      <div class="req-scroll"><table class="req-table"><thead><tr><th>Item</th><th class="n">Pedido</th>${almox ? '<th class="n">Disp.</th>' : ''}<th class="n">${editing ? 'Aprovar' : 'Aprovada'}</th><th class="n">Entregue</th></tr></thead><tbody>${rows}</tbody></table></div>
+      ${editing ? `<div class="req-note">Aprovando menos do que o pedido, o restante fica sem atendimento nesta requisição. Ao aprovar, a quantidade fica reservada; a baixa só acontece na entrega.</div>
+        <div class="field"><label class="f-label" for="rqMotivo">Motivo (obrigatório para recusar)</label><textarea id="rqMotivo" class="f-input" rows="2"></textarea></div>` : ''}
+      <div class="req-err" id="rqErr" style="display:none"></div>
+      ${acts ? `<div class="req-acts">${acts}</div>` : ''}
+      ${hist ? `<div class="sec-title">Histórico</div>${hist}` : ''}
+    </div></div>`;
+  reqBindBack();
+  const bind = (id, fn) => { const el = byId(id); if(el) el.onclick = fn; };
+  main.querySelectorAll('.req-ap').forEach(inp => { inp.oninput = () => { reqAprov[r.id + '|' + inp.getAttribute('data-pid')] = Math.max(0, Math.floor(+inp.value || 0)); }; });
+  bind('rqPrint', () => printReqSheet(r.id));
+  bind('rqIniciar', () => reqSimple(r.id, 'em_analise', ['aberta']));
+  bind('rqSeparar', () => reqSimple(r.id, 'separada', ['aprovada']));
+  bind('rqCancelar', () => reqSimple(r.id, 'cancelada', ['aberta']));
+  bind('rqAprovar', () => reqApprove(r.id));
+  bind('rqRecusar', () => reqRefuse(r.id));
+  bind('rqLiberar', () => reqReleaseCancel(r.id));
+  bind('rqEntregar', () => reqDeliver(r.id));
+}
+
+function reqShowErr(msg){ const el = byId('rqErr'); if(el){ el.textContent = msg; el.style.display = 'block'; } else showSnack(msg); }
+
+async function reqSimple(id, status, from){
+  try{
+    await db.runTransaction(async tx => {
+      const ref = db.collection('almox_requisicoes').doc(id); const s = await tx.get(ref);
+      if(!s.exists || !from.includes(s.data().status)) throw new Error('O status desta requisição mudou. Atualize a tela.');
+      tx.update(ref, { status, ...reqStamp(status) });
+    });
+    reqPushNotify(id, status);
+  }catch(e){ reqShowErr(reqErr(e)); }
+}
+
+async function reqApprove(id){
+  const qty = {};
+  document.querySelectorAll('.req-ap').forEach(el => { qty[el.getAttribute('data-pid')] = Math.max(0, Math.floor(+el.value || 0)); });
+  try{
+    await db.runTransaction(async tx => {
+      const rref = db.collection('almox_requisicoes').doc(id);
+      const rs = await tx.get(rref); const cur = rs.data();
+      if(!cur || !['aberta', 'em_analise'].includes(cur.status)) throw new Error('Esta requisição já foi tratada por outra pessoa.');
+      const prefs = cur.itens.map(it => db.collection('almox_produtos').doc(it.produtoId));
+      const snaps = await Promise.all(prefs.map(p => tx.get(p)));
+      let total = 0, parcial = false;
+      const itens = cur.itens.map((it, i) => {
+        const p = snaps[i].data() || {}; const disp = (p.saldo || 0) - (p.reservado || 0);
+        const ap = Math.min(qty[it.produtoId] || 0, it.pedido);
+        if(ap > disp) throw new Error(`${it.descricao}: só há ${disp} disponível.`);
+        total += ap; if(ap < it.pedido) parcial = true;
+        return { ...it, aprovada: ap };
+      });
+      if(!total) throw new Error('Nenhum item aprovado. Use Recusar e informe o motivo.');
+      itens.forEach((it, i) => { if(it.aprovada > 0) tx.update(prefs[i], { reservado: ((snaps[i].data().reservado) || 0) + it.aprovada }); });
+      tx.update(rref, { status: 'aprovada', parcial, itens, ...reqStamp('aprovada') });
+    });
+    reqPushNotify(id, 'aprovada');
+  }catch(e){ reqShowErr(reqErr(e)); }
+}
+
+async function reqRefuse(id){
+  const motivo = ((byId('rqMotivo') || {}).value || '').trim();
+  if(!motivo){ reqShowErr('Informe o motivo da recusa.'); return; }
+  try{
+    await db.runTransaction(async tx => {
+      const ref = db.collection('almox_requisicoes').doc(id); const s = await tx.get(ref);
+      if(!s.exists || !['aberta', 'em_analise'].includes(s.data().status)) throw new Error('O status desta requisição mudou. Atualize a tela.');
+      tx.update(ref, { status: 'recusada', motivo, ...reqStamp('recusada') });
+    });
+    reqPushNotify(id, 'recusada');
+  }catch(e){ reqShowErr(reqErr(e)); }
+}
+
+async function reqReleaseCancel(id){
+  if(!confirm('Cancelar esta requisição e liberar a quantidade reservada?')) return;
+  try{
+    await db.runTransaction(async tx => {
+      const rref = db.collection('almox_requisicoes').doc(id); const rs = await tx.get(rref); const cur = rs.data();
+      if(!cur || cur.status !== 'aprovada') throw new Error('O status desta requisição mudou. Atualize a tela.');
+      const prefs = cur.itens.map(it => db.collection('almox_produtos').doc(it.produtoId));
+      const snaps = await Promise.all(prefs.map(p => tx.get(p)));
+      cur.itens.forEach((it, i) => { if(it.aprovada > 0) tx.update(prefs[i], { reservado: Math.max(0, ((snaps[i].data() || {}).reservado || 0) - it.aprovada) }); });
+      tx.update(rref, { status: 'cancelada', ...reqStamp('cancelada') });
+    });
+    reqPushNotify(id, 'cancelada');
+  }catch(e){ reqShowErr(reqErr(e)); }
+}
+
+async function reqDeliver(id){
+  try{
+    await db.runTransaction(async tx => {
+      const rref = db.collection('almox_requisicoes').doc(id); const rs = await tx.get(rref); const cur = rs.data();
+      if(!cur || cur.status !== 'separada') throw new Error('O status desta requisição mudou. Atualize a tela.');
+      const prefs = cur.itens.map(it => db.collection('almox_produtos').doc(it.produtoId));
+      const snaps = await Promise.all(prefs.map(p => tx.get(p)));
+      const itens = cur.itens.map((it, i) => {
+        const p = snaps[i].data() || {};
+        if((p.saldo || 0) < it.aprovada) throw new Error(`${it.descricao}: saldo insuficiente (${p.saldo || 0}). Lance uma entrada ou ajuste antes.`);
+        return { ...it, entregue: it.aprovada, custoUnit: p.custo || 0 };
+      });
+      itens.forEach((it, i) => {
+        if(!it.entregue) return;
+        const p = snaps[i].data();
+        const novoSaldo = (p.saldo || 0) - it.entregue;
+        tx.update(prefs[i], { saldo: novoSaldo, reservado: Math.max(0, (p.reservado || 0) - it.entregue) });
+        tx.set(db.collection('almox_movimentos').doc(), {
+          tipo: 'saida', produtoId: it.produtoId, codigo: it.codigo, descricao: it.descricao, qtd: it.entregue, saldoApos: novoSaldo,
+          reqId: id, reqNum: cur.numero, setor: cur.setor, obs: '', data: firebase.firestore.FieldValue.serverTimestamp(), por: myUid, porNome: reqMyName()
+        });
+      });
+      tx.update(rref, { status: 'entregue', itens, entregueEm: firebase.firestore.FieldValue.serverTimestamp(), ...reqStamp('entregue') });
+    });
+    reqPushNotify(id, 'entregue');
+  }catch(e){ reqShowErr(reqErr(e)); }
+}
+
+// ----- produto (estoque) -----
+function reqProdMoves(pid){ return reqMoves.filter(m => m.produtoId === pid); }
+
+function renderReqProd(main, p){
+  const moves = reqProdMoves(p.id).slice(0, 40);
+  main.innerHTML = reqHead(reqBoxSvg, p.descricao || '', escapeHtml(p.codigo || '') + (p.ativo === false ? ' · inativo' : ''),
+    `<button class="head-btn" id="rpEdit" title="Editar produto" aria-label="Editar produto">${editSvg}</button>`) + `
+    <div class="pane-body"><div class="form-pane">
+      <div class="stat-grid">
+        <div class="stat"><div class="stat-num">${p.saldo || 0}</div><div class="stat-label">Saldo (${escapeHtml(p.unidade || '')})</div></div>
+        <div class="stat"><div class="stat-num">${p.reservado || 0}</div><div class="stat-label">Reservado</div></div>
+        <div class="stat${reqLow(p) ? ' warn' : ' good'}"><div class="stat-num">${reqDisp(p)}</div><div class="stat-label">Disponível</div></div>
+        <div class="stat"><div class="stat-num">${p.estoqueMin || 0}</div><div class="stat-label">Mínimo</div></div>
+      </div>
+      <div class="req-note">${p.categoria ? 'Categoria: <b>' + escapeHtml(p.categoria) + '</b> · ' : ''}Local: <b>${escapeHtml(p.localizacao || '—')}</b> · Custo unitário: <b>${reqMoney(p.custo)}</b></div>
+      ${reqLow(p) ? '<div class="req-err">Abaixo do estoque mínimo.</div>' : ''}
+      <div class="req-note">O saldo muda só por movimentações. Ninguém edita o número diretamente.</div>
+      <div class="req-acts"><button class="btn primary" id="rpMove" type="button">Lançar movimentação</button><button class="btn" id="rpToggle" type="button">${p.ativo === false ? 'Reativar produto' : 'Desativar produto'}</button></div>
+      <div class="sec-title">Últimas movimentações</div>
+      ${moves.length ? `<div class="req-scroll"><table class="req-table"><thead><tr><th>Data</th><th>Tipo</th><th class="n">Qtd.</th><th class="n">Saldo após</th><th>Responsável</th><th>Req.</th></tr></thead><tbody>
+        ${moves.map(m => `<tr><td>${escapeHtml(fmtDateTime(tsMs(m.data) || Date.now()))}</td><td>${escapeHtml(REQ_TIPOS[m.tipo] || m.tipo)}${m.obs ? '<div class="rc-sub">' + escapeHtml(m.obs) + '</div>' : ''}</td><td class="n">${m.qtd > 0 && m.tipo !== 'saida' ? '+' : (m.tipo === 'saida' ? '−' : '')}${Math.abs(m.qtd)}</td><td class="n">${m.saldoApos !== undefined ? m.saldoApos : ''}</td><td>${escapeHtml(m.porNome || '')}</td><td>${m.reqNum ? escapeHtml(reqNum(m.reqNum)) : ''}</td></tr>`).join('')}
+        </tbody></table></div>` : '<div class="list-empty">Sem movimentações ainda.</div>'}
+    </div></div>`;
+  reqBindBack();
+  byId('rpEdit').onclick = () => openReqProdForm(p.id);
+  byId('rpMove').onclick = () => showReqMoveModal(p.id);
+  byId('rpToggle').onclick = () => db.collection('almox_produtos').doc(p.id).update({ ativo: p.ativo === false }).catch(e => showSnack(reqErr(e)));
+}
+
+function renderReqProdForm(main, p){
+  p = p || {};
+  const novo = !p.id;
+  const cats = [...new Set(reqProducts.map(x => x.categoria).filter(Boolean))];
+  main.innerHTML = reqHead(plusSvg, novo ? 'Novo produto' : 'Editar produto', novo ? 'O saldo inicial entra como uma movimentação' : escapeHtml(p.codigo || '')) + `
+    <div class="pane-body"><div class="form-pane">
+      <div class="field-row">
+        <div class="field"><label class="f-label" for="pfCod">Código</label><input id="pfCod" class="f-input" type="text" maxlength="30" value="${escapeAttr(p.codigo || '')}" /></div>
+        <div class="field"><label class="f-label" for="pfUn">Unidade</label><select id="pfUn" class="f-input">${(REQ_UNITS.includes(p.unidade || 'un') ? REQ_UNITS : [p.unidade].concat(REQ_UNITS)).map(u => `<option${(p.unidade || 'un') === u ? ' selected' : ''}>${u}</option>`).join('')}</select></div>
+      </div>
+      <div class="field"><label class="f-label" for="pfDesc">Descrição</label><input id="pfDesc" class="f-input" type="text" maxlength="90" value="${escapeAttr(p.descricao || '')}" /></div>
+      <div class="field-row">
+        <div class="field"><label class="f-label" for="pfCat">Categoria</label><input id="pfCat" class="f-input" type="text" list="pfCatList" maxlength="40" value="${escapeAttr(p.categoria || '')}" /><datalist id="pfCatList">${cats.map(c => `<option value="${escapeAttr(c)}">`).join('')}</datalist></div>
+        <div class="field"><label class="f-label" for="pfLoc">Localização</label><input id="pfLoc" class="f-input" type="text" maxlength="40" value="${escapeAttr(p.localizacao || '')}" /></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label class="f-label" for="pfMin">Estoque mínimo</label><input id="pfMin" class="f-input" type="number" min="0" step="1" value="${p.estoqueMin || 0}" /></div>
+        <div class="field"><label class="f-label" for="pfCusto">Custo unitário (R$)</label><input id="pfCusto" class="f-input" type="number" min="0" step="0.01" value="${p.custo || 0}" /></div>
+        ${novo ? '<div class="field"><label class="f-label" for="pfSaldo">Saldo inicial</label><input id="pfSaldo" class="f-input" type="number" min="0" step="1" value="0" /></div>' : ''}
+      </div>
+      <div class="field"><label class="f-label" for="pfFoto">Foto (opcional)</label>
+        <div style="display:flex;gap:10px;align-items:center;">${p.foto ? `<img class="req-foto" id="pfFotoPrev" src="${escapeAttr(p.foto)}" alt="">` : '<img class="req-foto" id="pfFotoPrev" alt="" style="display:none">'}<input id="pfFoto" type="file" accept="image/*" /></div></div>
+      <div class="req-err" id="pfErr" style="display:none"></div>
+      <div class="form-actions"><button class="btn" id="pfCancel" type="button">Cancelar</button><button class="btn primary" id="pfSave" type="button">Salvar</button></div>
+    </div></div>`;
+  reqBindBack();
+  let foto = p.foto || '';
+  byId('pfFoto').onchange = e => {
+    const f = e.target.files && e.target.files[0]; if(!f) return;
+    const img = new Image(); const url = URL.createObjectURL(f);
+    img.onload = () => {
+      const c = document.createElement('canvas'); const s = 160 / Math.max(img.width, img.height, 1);
+      c.width = Math.round(img.width * Math.min(1, s)); c.height = Math.round(img.height * Math.min(1, s));
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      foto = c.toDataURL('image/jpeg', 0.7); URL.revokeObjectURL(url);
+      const prev = byId('pfFotoPrev'); prev.src = foto; prev.style.display = 'block';
+    };
+    img.src = url;
+  };
+  byId('pfCancel').onclick = () => { reqView = novo ? null : { type: 'prod', id: p.id }; renderReqMain(); };
+  byId('pfSave').onclick = async () => {
+    const err = m => { const el = byId('pfErr'); el.textContent = m; el.style.display = 'block'; };
+    const codigo = byId('pfCod').value.trim(), descricao = byId('pfDesc').value.trim();
+    if(!codigo || !descricao){ err('Informe código e descrição.'); return; }
+    if(reqProducts.some(x => x.id !== p.id && (x.codigo || '').toLowerCase() === codigo.toLowerCase())){ err('Já existe um produto com esse código.'); return; }
+    const data = {
+      codigo, descricao, unidade: byId('pfUn').value, categoria: byId('pfCat').value.trim(), localizacao: byId('pfLoc').value.trim(),
+      estoqueMin: Math.max(0, Math.floor(+byId('pfMin').value || 0)), custo: Math.max(0, +byId('pfCusto').value || 0), foto
+    };
+    try{
+      if(novo){
+        const saldo0 = Math.max(0, Math.floor(+(byId('pfSaldo') || {}).value || 0));
+        const ref = db.collection('almox_produtos').doc();
+        const batch = db.batch();
+        batch.set(ref, { ...data, saldo: saldo0, reservado: 0, ativo: true, criadoEm: firebase.firestore.FieldValue.serverTimestamp() });
+        if(saldo0 > 0) batch.set(db.collection('almox_movimentos').doc(), { tipo: 'entrada', produtoId: ref.id, codigo, descricao, qtd: saldo0, saldoApos: saldo0, obs: 'Saldo inicial', data: firebase.firestore.FieldValue.serverTimestamp(), por: myUid, porNome: reqMyName() });
+        await batch.commit();
+        reqView = { type: 'prod', id: ref.id };
+      } else {
+        await db.collection('almox_produtos').doc(p.id).update(data);
+        reqView = { type: 'prod', id: p.id };
+      }
+      renderReqList(); renderReqMain();
+    }catch(e){ err(reqErr(e)); }
+  };
+}
+
+function showReqMoveModal(pid){
+  const p = reqProd(pid); if(!p) return;
+  const root = byId('modalRoot');
+  root.innerHTML = `<div class="modal-bg" id="modalBg"><div class="modal">
+    <h3>Lançar movimentação</h3>
+    <div class="req-note" style="margin-bottom:10px;">${escapeHtml(p.descricao)} · saldo atual ${p.saldo || 0} ${escapeHtml(p.unidade || '')}</div>
+    <select id="mvTipo" class="f-input" style="margin-bottom:12px;"><option value="entrada">Entrada (compra, recebimento)</option><option value="devolucao">Devolução de um setor</option><option value="ajuste">Ajuste (nova contagem)</option></select>
+    <input id="mvQtd" type="number" min="0" step="1" placeholder="Quantidade" />
+    <input id="mvReq" type="text" placeholder="Nº da requisição (opcional)" maxlength="12" style="display:none" />
+    <input id="mvObs" type="text" placeholder="Observação" maxlength="120" />
+    <div class="req-err" id="mvErr" style="display:none;margin-bottom:10px;"></div>
+    <div class="actions"><button class="cancel" id="mvCancel">Cancelar</button><button class="confirm" id="mvOk">Lançar</button></div></div></div>`;
+  const tipo = byId('mvTipo'), qtd = byId('mvQtd');
+  const sync = () => {
+    qtd.placeholder = tipo.value === 'ajuste' ? 'Novo saldo (contagem real)' : 'Quantidade';
+    byId('mvReq').style.display = tipo.value === 'devolucao' ? 'block' : 'none';
+    byId('mvObs').placeholder = tipo.value === 'ajuste' ? 'Motivo do ajuste (obrigatório)' : 'Observação';
+  };
+  tipo.onchange = sync; sync();
+  byId('mvCancel').onclick = () => { root.innerHTML = ''; };
+  byId('modalBg').onclick = e => { if(e.target.id === 'modalBg') root.innerHTML = ''; };
+  byId('mvOk').onclick = async () => {
+    const err = m => { const el = byId('mvErr'); el.textContent = m; el.style.display = 'block'; };
+    const v = Math.floor(+qtd.value); const obs = byId('mvObs').value.trim();
+    if(isNaN(v) || v < 0 || qtd.value === ''){ err('Informe a quantidade.'); return; }
+    if(tipo.value !== 'ajuste' && v === 0){ err('A quantidade deve ser maior que zero.'); return; }
+    if(tipo.value === 'ajuste' && !obs){ err('Informe o motivo do ajuste.'); return; }
+    const rn = parseInt((byId('mvReq').value || '').replace(/\D/g, ''), 10) || null;
+    try{
+      await db.runTransaction(async tx => {
+        const ref = db.collection('almox_produtos').doc(pid); const s = await tx.get(ref); const cur = s.data() || {};
+        const delta = tipo.value === 'ajuste' ? v - (cur.saldo || 0) : v;
+        const novo = (cur.saldo || 0) + delta;
+        if(novo < 0) throw new Error('O saldo não pode ficar negativo.');
+        if(novo < (cur.reservado || 0)) throw new Error('O saldo ficaria menor que a quantidade já reservada (' + (cur.reservado || 0) + ').');
+        tx.update(ref, { saldo: novo });
+        tx.set(db.collection('almox_movimentos').doc(), { tipo: tipo.value, produtoId: pid, codigo: cur.codigo || '', descricao: cur.descricao || '', qtd: delta, saldoApos: novo, reqNum: rn, obs, data: firebase.firestore.FieldValue.serverTimestamp(), por: myUid, porNome: reqMyName() });
+      });
+      root.innerHTML = '';
+    }catch(e){ err(reqErr(e)); }
+  };
+}
+
+// ----- relatório por setor -----
+function reqReportData(){
+  const now = new Date(); let from = 0, to = Infinity;
+  if(reqPeriod === 'mes') from = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  else if(reqPeriod === 'anterior'){ from = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime(); to = new Date(now.getFullYear(), now.getMonth(), 1).getTime(); }
+  else if(reqPeriod === '90') from = Date.now() - 90 * 86400000;
+  const del = reqList.filter(r => r.status === 'entregue').filter(r => { const t = tsMs(r.entregueEm) || tsMs(r.atualizadoEm); return t >= from && t < to; });
+  const custoItem = it => (it.entregue || 0) * (it.custoUnit || (reqProd(it.produtoId) || {}).custo || 0);
+  const porSetor = {};
+  reqSetores().forEach(s => { porSetor[s.nome] = 0; });
+  del.forEach(r => { porSetor[r.setor] = (porSetor[r.setor] || 0) + (r.itens || []).reduce((a, it) => a + custoItem(it), 0); });
+  const agg = {};
+  del.filter(r => !reqSetorFilter || r.setor === reqSetorFilter).forEach(r => (r.itens || []).forEach(it => {
+    const a = agg[it.produtoId] || (agg[it.produtoId] = { nome: it.descricao, un: it.unidade, qtd: 0, valor: 0 });
+    a.qtd += it.entregue || 0; a.valor += custoItem(it);
+  }));
+  const produtos = Object.values(agg).filter(a => a.qtd > 0).sort((a, b) => b.valor - a.valor);
+  const total = produtos.reduce((a, p) => a + p.valor, 0);
+  return { porSetor: Object.entries(porSetor).sort((a, b) => b[1] - a[1]), produtos, total, qtdReq: del.length };
+}
+const REQ_PERIODOS = [['mes', 'Mês atual'], ['anterior', 'Mês anterior'], ['90', 'Últimos 90 dias'], ['tudo', 'Tudo']];
+
+function renderReqReport(main){
+  const d = reqReportData();
+  const max = Math.max(1, ...d.porSetor.map(x => x[1]));
+  main.innerHTML = reqHead(chartSvg, 'Gasto por setor', (reqSetorFilter ? escapeHtml(reqSetorFilter) : 'Todos os setores') + ' · ' + d.qtdReq + ' requisição(ões) entregue(s)',
+    `<button class="head-btn" id="rrPrint" title="Imprimir relatório" aria-label="Imprimir relatório">${printSvg}</button>`) + `
+    <div class="pane-body"><div class="form-pane">
+      <div class="field"><label class="f-label" for="rrPer">Período</label><select id="rrPer" class="f-input">${REQ_PERIODOS.map(([k, l]) => `<option value="${k}"${reqPeriod === k ? ' selected' : ''}>${l}</option>`).join('')}</select></div>
+      <div class="sec-title">Consumo por centro de custo</div>
+      <div>${d.porSetor.map(([n, v]) => `<div class="req-bar-row" data-bar="${escapeAttr(n)}"><div class="req-bar-top"><b>${escapeHtml(n)}</b><span>${reqMoney(v)}</span></div><div class="req-bar"><i class="${reqSetorFilter === n ? 'sel' : ''}" style="width:${Math.round(v / max * 100)}%"></i></div></div>`).join('')}</div>
+      <div class="sec-title">Onde mais se gasta${reqSetorFilter ? ' — ' + escapeHtml(reqSetorFilter) : ''}</div>
+      ${d.produtos.length ? `<div class="req-scroll"><table class="req-table"><thead><tr><th>Produto</th><th class="n">Qtd.</th><th class="n">Valor</th><th class="n">%</th></tr></thead><tbody>
+        ${d.produtos.map(p => `<tr><td>${escapeHtml(p.nome)}</td><td class="n">${p.qtd} ${escapeHtml(p.un || '')}</td><td class="n">${reqMoney(p.valor)}</td><td class="n">${d.total ? Math.round(p.valor / d.total * 100) : 0}%</td></tr>`).join('')}
+        <tr><td><b>Total</b></td><td></td><td class="n"><b>${reqMoney(d.total)}</b></td><td class="n"><b>100%</b></td></tr></tbody></table></div>` : '<div class="list-empty">Nenhuma entrega no período.</div>'}
+      <div class="req-note">Considera só requisições entregues, com o custo unitário do produto na data da entrega.</div>
+    </div></div>`;
+  reqBindBack();
+  byId('rrPer').onchange = e => { reqPeriod = e.target.value; renderReqMain(); };
+  byId('rrPrint').onclick = printReqReport;
+  main.querySelectorAll('[data-bar]').forEach(el => { el.onclick = () => { reqSetorFilter = reqSetorFilter === el.getAttribute('data-bar') ? '' : el.getAttribute('data-bar'); renderReqList(); renderReqMain(); }; });
+}
+
+// ----- impressão (nome do arquivo referencia o documento e o nº) -----
+function reqOpenPrint(title, bodyHtml){
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>
+    @page{size:A4;margin:14mm;}
+    body{font-family:Arial,sans-serif;color:#222;margin:0;}
+    .via{page-break-after:always;padding:4px 2px;} .via:last-child{page-break-after:auto;}
+    .hd{display:flex;justify-content:space-between;border-bottom:3px solid #3b2a1f;padding-bottom:8px;margin-bottom:12px;}
+    h1{font-size:18px;margin:0;} .sub{font-size:12px;color:#555;} .num{font-size:20px;font-weight:700;text-align:right;}
+    .info{display:grid;grid-template-columns:1fr 1fr;gap:5px 20px;font-size:12.5px;margin-bottom:10px;}
+    table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:8px;} th{background:#3b2a1f;color:#fff;text-align:left;padding:6px 8px;}
+    td{border-bottom:1px solid #ccc;padding:6px 8px;} .n{text-align:right;}
+    .sig{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:70px;font-size:12.5px;} .sig div{border-top:1px solid #222;padding-top:5px;}
+    .box{border:1px solid #999;padding:8px 10px;font-size:12.5px;margin:8px 0;}
+  </style></head><body>${bodyHtml}</body></html>`;
+  const w = window.open('', '_blank');
+  if(!w){ showSnack('Permita pop-ups para imprimir.'); return; }
+  w.document.write(html); w.document.close();
+  w.onload = () => w.print();
+}
+
+function printReqSheet(id){
+  const r = reqList.find(x => x.id === id); if(!r) return;
+  const num = reqNum(r.numero);
+  const dt = new Date(tsMs(r.criadoEm) || Date.now()).toLocaleDateString('pt-BR');
+  const rows = (r.itens || []).map(it => `<tr><td>${escapeHtml(it.codigo || '')}</td><td>${escapeHtml(it.descricao)}</td><td>${escapeHtml(it.unidade || '')}</td><td class="n">${it.pedido}</td><td class="n">${it.aprovada || 0}</td><td class="n">${it.entregue || ''}</td></tr>`).join('');
+  const via = t => `<section class="via">
+    <div class="hd"><div><h1>D Coração Home</h1><div class="sub">Almoxarifado · Requisição de insumos</div></div><div><div class="num">${escapeHtml(num)}</div><div class="sub">${t}</div></div></div>
+    <div class="info"><div><b>Setor solicitante:</b> ${escapeHtml(r.setor || '')}</div><div><b>Centro de custo:</b> ${escapeHtml(r.centroCusto || '—')}</div>
+      <div><b>Solicitante:</b> ${escapeHtml(r.criadoPorNome || '')}</div><div><b>Urgência:</b> ${r.urgencia === 'urgente' ? 'Urgente' : 'Normal'}</div>
+      <div><b>Aberta em:</b> ${dt}</div><div><b>Atendida em:</b> ____ / ____ / ________</div></div>
+    ${r.justificativa ? `<div class="box"><b>Justificativa:</b> ${escapeHtml(r.justificativa)}</div>` : ''}
+    <table><thead><tr><th>Código</th><th>Descrição</th><th>Un.</th><th class="n">Pedido</th><th class="n">Aprovada</th><th class="n">Entregue</th></tr></thead><tbody>${rows}</tbody></table>
+    <div class="sig"><div>Responsável pelo almoxarifado</div><div>Solicitante / recebedor do setor</div></div>
+  </section>`;
+  reqOpenPrint('Requisicao_Insumos_' + num, via('1ª via — Almoxarifado') + via('2ª via — Setor solicitante'));
+}
+
+function printReqReport(){
+  const d = reqReportData();
+  const per = (REQ_PERIODOS.find(x => x[0] === reqPeriod) || [0, ''])[1];
+  const body = `<section class="via"><div class="hd"><div><h1>D Coração Home</h1><div class="sub">Almoxarifado · Gasto de insumos por setor</div></div><div class="sub">${escapeHtml(per)} · emitido em ${new Date().toLocaleDateString('pt-BR')}</div></div>
+    <table><thead><tr><th>Centro de custo</th><th class="n">Valor</th></tr></thead><tbody>${d.porSetor.map(([n, v]) => `<tr><td>${escapeHtml(n)}</td><td class="n">${reqMoney(v)}</td></tr>`).join('')}</tbody></table>
+    <h1 style="margin-top:18px;font-size:15px;">Onde mais se gasta${reqSetorFilter ? ' — ' + escapeHtml(reqSetorFilter) : ' (todos os setores)'}</h1>
+    <table><thead><tr><th>Produto</th><th class="n">Qtd.</th><th class="n">Valor</th><th class="n">%</th></tr></thead><tbody>
+    ${d.produtos.map(p => `<tr><td>${escapeHtml(p.nome)}</td><td class="n">${p.qtd} ${escapeHtml(p.un || '')}</td><td class="n">${reqMoney(p.valor)}</td><td class="n">${d.total ? Math.round(p.valor / d.total * 100) : 0}%</td></tr>`).join('')}
+    <tr><td><b>Total</b></td><td></td><td class="n"><b>${reqMoney(d.total)}</b></td><td class="n"><b>100%</b></td></tr></tbody></table></section>`;
+  reqOpenPrint('Relatorio_Gasto_por_Setor' + (reqSetorFilter ? '_' + reqSetorFilter.replace(/\s+/g, '_') : ''), body);
+}
+
+// ----- configuração (admin): setores/centros de custo e responsáveis -----
+function showReqConfigModal(){
+  if(!isAdmin) return;
+  const root = byId('modalRoot');
+  const users = allUsers.filter(u => !u.blocked).sort((a, b) => displayNameFor(a).toLowerCase().localeCompare(displayNameFor(b).toLowerCase()));
+  root.innerHTML = `<div class="modal-bg" id="modalBg"><div class="modal" style="max-width:460px;">
+    <h3>Quem atende as requisições</h3>
+    <div class="req-note" style="margin-bottom:8px;">Além dos administradores, estas pessoas veem a fila, aprovam, entregam e cadastram produtos.</div>
+    <div class="assignee-box" style="margin-bottom:12px;">${users.map(u => `<label class="assignee-row"><input type="checkbox" class="cf-uid" value="${escapeAttr(u.uid)}"${(reqCfg.uids || []).includes(u.uid) ? ' checked' : ''}/><span>${escapeHtml(displayNameFor(u))}</span></label>`).join('') || '<div class="list-empty">Sem usuários.</div>'}</div>
+    <div class="actions"><button class="cancel" id="cfCancel">Cancelar</button><button class="confirm" id="cfOk">Salvar</button></div></div></div>`;
+  byId('cfCancel').onclick = () => { root.innerHTML = ''; };
+  byId('modalBg').onclick = e => { if(e.target.id === 'modalBg') root.innerHTML = ''; };
+  byId('cfOk').onclick = () => {
+    const uids = [...document.querySelectorAll('.cf-uid:checked')].map(i => i.value);
+    db.collection('almox_config').doc('geral').set({ uids }, { merge: true })
+      .then(() => { root.innerHTML = ''; showSnack('Salvo.'); }).catch(e => showSnack(reqErr(e)));
+  };
+}
+
+// Setores e centros de custo + pessoa de cada setor: cadastro do painel inteiro (somente administrador)
+function showSetoresModal(){
+  if(!isAdmin) return;
+  const root = byId('modalRoot');
+  const txt = reqSetores().map(s => s.nome + (s.cc ? ' | ' + s.cc : '')).join('\n');
+  const users = allUsers.filter(u => !u.blocked).sort((a, b) => displayNameFor(a).toLowerCase().localeCompare(displayNameFor(b).toLowerCase()));
+  const pessoas = () => {
+    const nomes = byId('stTxt').value.split('\n').map(l => l.split('|')[0].trim()).filter(Boolean);
+    byId('stPeople').innerHTML = users.map(u => {
+      const cur = byId('stPeople').querySelector('[data-uid="' + u.uid + '"]');
+      const sel = cur ? cur.value : (appSetorUsers[u.uid] || '');
+      return `<div class="req-cart-row"><div class="rc-main"><div class="rc-name">${escapeHtml(displayNameFor(u))}</div></div>
+        <select class="f-input" data-uid="${escapeAttr(u.uid)}" style="max-width:55%;"><option value="">Sem setor</option>${nomes.map(n => `<option${n === sel ? ' selected' : ''}>${escapeHtml(n)}</option>`).join('')}</select></div>`;
+    }).join('') || '<div class="list-empty">Sem usuários.</div>';
+  };
+  root.innerHTML = `<div class="modal-bg" id="modalBg"><div class="modal" style="max-width:500px;max-height:90vh;overflow:auto;">
+    <h3>Setores e centros de custo</h3>
+    <div class="req-note" style="margin-bottom:8px;">Um por linha, no formato <b>Setor | Centro de custo</b>. A lista vale para todo o painel e só o administrador altera.</div>
+    <textarea id="stTxt" class="f-input" rows="6" style="margin-bottom:12px;">${escapeHtml(txt)}</textarea>
+    <div class="req-note" style="margin-bottom:6px;"><b>Pessoas por setor.</b> Quem tem setor pede só por ele e vê as requisições do próprio setor. Quem fica sem setor escolhe o setor ao pedir e vê só as suas.</div>
+    <div id="stPeople" class="card-list" style="margin-bottom:10px;"></div>
+    <div class="req-err" id="stErr" style="display:none;margin-bottom:10px;"></div>
+    <div class="actions"><button class="cancel" id="stCancel">Cancelar</button><button class="confirm" id="stOk">Salvar</button></div></div></div>`;
+  pessoas();
+  byId('stTxt').onchange = pessoas;
+  byId('stCancel').onclick = () => { root.innerHTML = ''; };
+  byId('modalBg').onclick = e => { if(e.target.id === 'modalBg') root.innerHTML = ''; };
+  byId('stOk').onclick = () => {
+    const lista = byId('stTxt').value.split('\n').map(l => l.trim()).filter(Boolean).map(l => { const [n, c] = l.split('|'); return { nome: (n || '').trim(), cc: (c || '').trim() }; }).filter(x => x.nome);
+    const err = m => { const el = byId('stErr'); el.textContent = m; el.style.display = 'block'; };
+    if(!lista.length){ err('Cadastre ao menos um setor.'); return; }
+    const nomes = lista.map(x => x.nome.toLowerCase());
+    if(new Set(nomes).size !== nomes.length){ err('Há setores repetidos.'); return; }
+    const porUsuario = {};
+    byId('stPeople').querySelectorAll('[data-uid]').forEach(el => { if(el.value && lista.some(x => x.nome === el.value)) porUsuario[el.getAttribute('data-uid')] = el.value; });
+    db.collection('config').doc('setores').set({ lista, porUsuario }).then(() => { root.innerHTML = ''; showSnack('Setores salvos.'); }).catch(e => err(reqErr(e)));
+  };
+}
+
+// ----- importar produtos da planilha (aba ESTOQUE INSUMOS) -----
+function reqNorm(t){ return String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim(); }
+function reqParseNum(v){
+  let t = String(v == null ? '' : v).replace(/R\$/g, '').replace(/\s/g, '');
+  if(!t || t === '-') return 0;
+  const neg = /^\(.*\)$/.test(t) || t.startsWith('-');
+  t = t.replace(/[()\-]/g, '');
+  if(t.includes(',')) t = t.replace(/\./g, '').replace(',', '.');
+  else if(/^\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, '');
+  const n = parseFloat(t);
+  return isNaN(n) ? 0 : (neg ? -n : n);
+}
+function reqParseTable(text){
+  const first = text.split('\n')[0] || '';
+  const sep = first.includes('\t') ? '\t' : ((first.match(/;/g) || []).length > (first.match(/,/g) || []).length ? ';' : ',');
+  const rows = []; let row = [], cur = '', q = false;
+  for(let i = 0; i < text.length; i++){
+    const ch = text[i];
+    if(q){ if(ch === '"' && text[i + 1] === '"'){ cur += '"'; i++; } else if(ch === '"') q = false; else cur += ch; }
+    else if(ch === '"') q = true;
+    else if(ch === sep){ row.push(cur); cur = ''; }
+    else if(ch === '\n' || ch === '\r'){ if(ch === '\r' && text[i + 1] === '\n') i++; row.push(cur); cur = ''; if(row.some(c => c.trim())) rows.push(row); row = []; }
+    else cur += ch;
+  }
+  row.push(cur); if(row.some(c => c.trim())) rows.push(row);
+  return rows;
+}
+function reqBuildImport(text){
+  const rows = reqParseTable(text);
+  if(rows.length < 2) return { erro: 'Não encontrei linhas. Cole a aba com o cabeçalho (Insumo, Cor, Categoria, Unidade…).' };
+  const head = rows[0].map(reqNorm);
+  const col = f => head.findIndex(f);
+  const ix = {
+    nome: col(h => h === 'insumo' || h === 'produto' || h === 'descricao'), cor: col(h => h === 'cor'), cat: col(h => h === 'categoria'),
+    un: col(h => h === 'unidade'), min: col(h => h.startsWith('estoque min')), saldo: col(h => h.startsWith('saldo')), custo: col(h => h.startsWith('custo'))
+  };
+  if(ix.nome < 0) return { erro: 'Não achei a coluna "Insumo" no cabeçalho.' };
+  const byName = {}; reqProducts.forEach(p => { byName[reqNorm(p.descricao)] = p; });
+  let seq = reqProducts.reduce((m, p) => { const k = /^INS-(\d+)$/.exec(p.codigo || ''); return k ? Math.max(m, +k[1]) : m; }, 0);
+  const itens = [], vistos = {}; let negativos = 0;
+  rows.slice(1).forEach(r => {
+    const nome = (r[ix.nome] || '').trim(); if(!nome) return;
+    const cor = ix.cor >= 0 ? (r[ix.cor] || '').trim() : '';
+    const descricao = nome + (cor ? ' ' + cor : '');
+    const k = reqNorm(descricao); if(vistos[k]) return; vistos[k] = 1;
+    let un = ix.un >= 0 ? (r[ix.un] || '').trim() : 'un'; if(!un) un = 'un'; if(/^(un|m|kg|l|cx|pct|rolo)$/i.test(un)) un = un.toLowerCase();
+    let saldo = ix.saldo >= 0 ? Math.round(reqParseNum(r[ix.saldo])) : 0;
+    if(saldo < 0){ negativos++; saldo = 0; }
+    const ex = byName[k];
+    itens.push({
+      ex, descricao, categoria: ix.cat >= 0 ? (r[ix.cat] || '').trim() : '', unidade: un,
+      estoqueMin: ix.min >= 0 ? Math.max(0, Math.round(reqParseNum(r[ix.min]))) : 0, saldo,
+      custo: ix.custo >= 0 ? Math.max(0, reqParseNum(r[ix.custo])) : 0,
+      codigo: ex ? ex.codigo : 'INS-' + String(++seq).padStart(3, '0')
+    });
+  });
+  if(!itens.length) return { erro: 'Nenhum insumo encontrado.' };
+  return { itens, negativos, novos: itens.filter(i => !i.ex).length, existentes: itens.filter(i => i.ex).length };
+}
+
+function showReqImportModal(){
+  if(!isAlmox()) return;
+  const root = byId('modalRoot');
+  root.innerHTML = `<div class="modal-bg" id="modalBg"><div class="modal" style="max-width:520px;max-height:90vh;overflow:auto;">
+    <h3>Importar da planilha</h3>
+    <div class="req-note" style="margin-bottom:8px;">Na planilha, abra a aba <b>ESTOQUE INSUMOS</b>, selecione as colunas com o cabeçalho, copie e cole abaixo. Também aceita um arquivo CSV exportado da aba. Produtos já cadastrados são atualizados pelo nome.</div>
+    <input id="imFile" type="file" accept=".csv,.tsv,.txt" style="margin-bottom:8px;" />
+    <textarea id="imTxt" class="f-input" rows="6" placeholder="Insumo   Cor   Categoria   Unidade   Estoque mínimo   Saldo atual   Status   Custo unit. (R$)…"></textarea>
+    <label class="assignee-row" style="margin:10px 0;"><input type="checkbox" id="imSaldo" /><span>Também ajustar o saldo dos produtos já cadastrados ao da planilha (gera movimentação de ajuste). Produtos novos entram sempre com o saldo da planilha.</span></label>
+    <div class="req-note" id="imPrev" style="margin-bottom:8px;"></div>
+    <div class="req-err" id="imErr" style="display:none;margin-bottom:10px;"></div>
+    <div class="actions"><button class="cancel" id="imCancel">Cancelar</button><button class="confirm" id="imOk" disabled>Importar</button></div></div></div>`;
+  let plano = null;
+  const analisar = () => {
+    const t = byId('imTxt').value; const prev = byId('imPrev'), ok = byId('imOk'); byId('imErr').style.display = 'none';
+    if(!t.trim()){ prev.textContent = ''; ok.disabled = true; plano = null; return; }
+    plano = reqBuildImport(t);
+    if(plano.erro){ prev.textContent = ''; const e = byId('imErr'); e.textContent = plano.erro; e.style.display = 'block'; ok.disabled = true; plano = null; return; }
+    prev.innerHTML = `<b>${plano.novos}</b> novo(s) · <b>${plano.existentes}</b> para atualizar${plano.negativos ? ` · ${plano.negativos} com saldo negativo na planilha (entram com 0)` : ''}.`;
+    ok.disabled = false;
+  };
+  byId('imTxt').oninput = analisar;
+  byId('imFile').onchange = e => { const f = e.target.files && e.target.files[0]; if(!f) return; const fr = new FileReader(); fr.onload = () => { byId('imTxt').value = String(fr.result || ''); analisar(); }; fr.readAsText(f, 'utf-8'); };
+  byId('imCancel').onclick = () => { root.innerHTML = ''; };
+  byId('modalBg').onclick = e => { if(e.target.id === 'modalBg') root.innerHTML = ''; };
+  byId('imOk').onclick = async () => {
+    if(!plano) return;
+    const ajustar = byId('imSaldo').checked; const ok = byId('imOk'); ok.disabled = true; ok.textContent = 'Importando…';
+    const ts = firebase.firestore.FieldValue.serverTimestamp(); let feitos = 0, pulados = 0;
+    try{
+      for(let i = 0; i < plano.itens.length; i += 150){
+        const batch = db.batch();
+        plano.itens.slice(i, i + 150).forEach(it => {
+          const base = { codigo: it.codigo, descricao: it.descricao, categoria: it.categoria, unidade: it.unidade, estoqueMin: it.estoqueMin };
+          const mov = (ref, delta, saldoApos) => batch.set(db.collection('almox_movimentos').doc(), {
+            tipo: delta >= 0 && !it.ex ? 'entrada' : 'ajuste', produtoId: ref.id, codigo: it.codigo, descricao: it.descricao, qtd: delta, saldoApos,
+            obs: 'Importação da planilha ESTOQUE INSUMOS', data: ts, por: myUid, porNome: reqMyName() });
+          if(!it.ex){
+            const ref = db.collection('almox_produtos').doc();
+            batch.set(ref, { ...base, custo: it.custo, saldo: it.saldo, reservado: 0, localizacao: '', foto: '', ativo: true, criadoEm: ts });
+            if(it.saldo > 0) mov(ref, it.saldo, it.saldo);
+          } else {
+            const ref = db.collection('almox_produtos').doc(it.ex.id);
+            const upd = { ...base }; if(it.custo > 0) upd.custo = it.custo;
+            if(ajustar && it.saldo !== (it.ex.saldo || 0)){
+              if(it.saldo < (it.ex.reservado || 0)) pulados++;
+              else { upd.saldo = it.saldo; mov(ref, it.saldo - (it.ex.saldo || 0), it.saldo); }
+            }
+            batch.update(ref, upd);
+          }
+          feitos++;
+        });
+        await batch.commit();
+      }
+      root.innerHTML = '';
+      showSnack(`Importação concluída: ${feitos} produto(s).` + (pulados ? ` ${pulados} sem ajuste de saldo (menor que o reservado).` : ''));
+    }catch(e){ const er = byId('imErr'); er.textContent = reqErr(e); er.style.display = 'block'; ok.disabled = false; ok.textContent = 'Importar'; }
+  };
+}
 
 </script>
 </body>

@@ -1,0 +1,189 @@
+rules_version = '2';
+
+// =====================================================================
+// REGRAS DE SEGURANÇA — Painel D Coração Home
+// Cole em: Firebase Console > Firestore Database > Regras > Publicar
+//
+// Resumo:
+//  - Só entra quem está logado e não está bloqueado.
+//  - Admin = existe o documento admins/<uid>.
+//  - Aba (categoria): todos logados veem a lista; os LINKS só quem tem acesso
+//    (mesma lógica de canSeeCategory no painel: sem restrição, ou na lista de
+//    pessoas, ou em um dos grupos liberados).
+//  - Conversas: só os participantes leem e escrevem.
+//  - Demandas: criador, responsáveis e admin.
+//  - Grupos e registro de atividade: só admin.
+//  - Almoxarifado (requisição de insumos) e setores: ver os blocos ao final.
+// =====================================================================
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- funções ----------
+    function signedIn() {
+      return request.auth != null;
+    }
+    function isAdmin() {
+      return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+    function isBlocked() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('blocked', false) == true;
+    }
+    // logado e não bloqueado (admin nunca é barrado por isso)
+    function ok() {
+      return signedIn() && (isAdmin() || !isBlocked());
+    }
+    function myGroups() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('groups', [])
+        : [];
+    }
+    function canSeeCat(catId) {
+      let cat = get(/databases/$(database)/documents/categories/$(catId)).data;
+      return isAdmin()
+        || (cat.get('allowedUsers', []).size() == 0 && cat.get('allowedGroups', []).size() == 0)
+        || request.auth.uid in cat.get('allowedUsers', [])
+        || cat.get('allowedGroups', []).hasAny(myGroups());
+    }
+    function convParticipants(convId) {
+      return get(/databases/$(database)/documents/conversations/$(convId)).data.participants;
+    }
+    function demandOf(demandId) {
+      return get(/databases/$(database)/documents/demands/$(demandId)).data;
+    }
+    function inDemand(d) {
+      return d.createdBy == request.auth.uid || request.auth.uid in d.get('assignedTo', []);
+    }
+
+    // ---------- almoxarifado: funções ----------
+    function isAlmox() {
+      return isAdmin() ||
+        (exists(/databases/$(database)/documents/almox_config/geral) &&
+         request.auth.uid in get(/databases/$(database)/documents/almox_config/geral).data.get('uids', []));
+    }
+    // setor fixo da pessoa (cadastrado pelo admin em config/setores); vazio = sem setor
+    function mySetor() {
+      return exists(/databases/$(database)/documents/config/setores)
+        ? get(/databases/$(database)/documents/config/setores).data.get('porUsuario', {}).get(request.auth.uid, '')
+        : '';
+    }
+
+    // ---------- administradores ----------
+    match /admins/{uid} {
+      allow get: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow list: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // ---------- usuários ----------
+    match /users/{uid} {
+      allow read: if ok();
+      // a própria pessoa cria o cadastro no 1º acesso (sem se dar grupos nem tirar bloqueio); admin cria o convite
+      allow create: if signedIn() && (
+        isAdmin() ||
+        (request.auth.uid == uid &&
+         request.resource.data.keys().hasOnly(['email', 'lastLogin', 'online', 'lastSeen', 'chatName', 'mustChangePassword', 'createdAt']))
+      );
+      // a pessoa edita o próprio cadastro, exceto "blocked" e "groups"; admin edita qualquer um
+      allow update: if signedIn() && (
+        isAdmin() ||
+        (request.auth.uid == uid &&
+         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['blocked', 'groups']))
+      );
+      allow delete: if isAdmin();
+    }
+
+    // ---------- grupos de acesso (só admin) ----------
+    match /groups/{gid} {
+      allow read, write: if isAdmin();
+    }
+
+    // ---------- abas e links ----------
+    match /categories/{catId} {
+      allow read: if ok();
+      allow write: if isAdmin();
+
+      match /links/{linkId} {
+        allow read: if ok() && canSeeCat(catId);
+        allow write: if isAdmin();
+      }
+    }
+
+    // ---------- conversas ----------
+    match /conversations/{convId} {
+      allow read: if ok() && request.auth.uid in resource.data.participants;
+      allow create: if ok() && request.auth.uid in request.resource.data.participants;
+      allow update: if ok() && request.auth.uid in resource.data.participants
+        && request.resource.data.participants == resource.data.participants;
+      allow delete: if ok() && request.auth.uid in resource.data.participants;
+
+      match /messages/{msgId} {
+        allow read: if ok() && request.auth.uid in convParticipants(convId);
+        allow create: if ok() && request.auth.uid in convParticipants(convId)
+          && request.resource.data.senderUid == request.auth.uid;
+        allow update: if ok() && request.auth.uid in convParticipants(convId)
+          && request.resource.data.senderUid == resource.data.senderUid;
+        allow delete: if ok() && request.auth.uid in convParticipants(convId);
+      }
+    }
+
+    // ---------- demandas ----------
+    match /demands/{demandId} {
+      allow read: if ok() && (isAdmin() || resource.data.createdBy == request.auth.uid || request.auth.uid in resource.data.assignedTo);
+      allow create: if ok() && request.resource.data.createdBy == request.auth.uid;
+      allow update: if ok() && (isAdmin() || inDemand(resource.data));
+      allow delete: if ok() && (isAdmin() || resource.data.createdBy == request.auth.uid);
+
+      match /history/{hid} {
+        allow read, write: if ok() && (isAdmin() || inDemand(demandOf(demandId)));
+      }
+      match /updates/{uid2} {
+        allow read, write: if ok() && (isAdmin() || inDemand(demandOf(demandId)));
+      }
+    }
+
+    // ---------- setores e centros de custo (cadastro único do painel; só admin altera) ----------
+    match /config/setores {
+      allow read: if ok();
+      allow write: if isAdmin();
+    }
+
+    // ---------- almoxarifado / requisição de insumos ----------
+    match /almox_config/geral {
+      allow read: if ok();
+      allow write: if isAdmin();
+    }
+    match /almox_config/contador {
+      allow read: if ok();
+      allow create, update: if ok()
+        && request.resource.data.keys().hasOnly(['proximo'])
+        && request.resource.data.proximo is int;
+    }
+    match /almox_produtos/{pid} {
+      allow read: if ok();
+      allow write: if ok() && isAlmox();
+    }
+    match /almox_movimentos/{mid} {
+      allow read, create: if ok() && isAlmox();
+      allow update, delete: if false;
+    }
+    match /almox_requisicoes/{rid} {
+      allow read: if ok() && (isAlmox() || resource.data.criadoPor == request.auth.uid
+        || (mySetor() != '' && resource.data.setor == mySetor()));
+      allow create: if ok() && request.resource.data.criadoPor == request.auth.uid
+        && request.resource.data.status == 'aberta'
+        && (mySetor() == '' || request.resource.data.setor == mySetor());
+      allow update: if ok() && (isAlmox() ||
+        (resource.data.criadoPor == request.auth.uid && resource.data.status == 'aberta'
+         && request.resource.data.status == 'cancelada'));
+      allow delete: if false;
+    }
+
+    // ---------- registro de atividade ----------
+    match /activity/{aid} {
+      allow read: if isAdmin();
+      allow create: if ok();
+      allow update, delete: if false;
+    }
+  }
+}
