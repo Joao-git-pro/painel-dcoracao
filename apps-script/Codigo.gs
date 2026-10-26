@@ -1,7 +1,7 @@
 // =====================================================================
 // SERVIDOR DE NOTIFICAÇÕES (push) — Painel D Coração Home
 // Apps Script publicado como Aplicativo da Web. O painel chama este endereço
-// quando alguém manda mensagem ou cria uma demanda; aqui o aviso é enviado
+// quando alguém manda mensagem, cria uma demanda ou mexe numa requisição de insumos; aqui o aviso é enviado
 // pelo Firebase Cloud Messaging (FCM v1) para os aparelhos de quem deve receber,
 // mesmo com o app fechado.
 //
@@ -28,6 +28,7 @@ function doPost(e){
       case 'desregistrar': desregistrar_(uid, body.fcmToken); out = { ok: true }; break;
       case 'msg':         out = { ok: true, enviados: avisarMensagem_(uid, body.convId) }; break;
       case 'demanda':     out = { ok: true, enviados: avisarDemanda_(uid, body.demandId) }; break;
+      case 'requisicao':  out = { ok: true, enviados: avisarRequisicao_(uid, body.reqId, body.evento) }; break;
       default:            out = { ok: false, erro: 'ação desconhecida' };
     }
   }catch(err){
@@ -119,6 +120,64 @@ function avisarDemanda_(uid, demandId){
     n += enviar_(dest, { title: 'Nova demanda de ' + nome, body: titulo + prazo, section: 'demands' });
   });
   return n;
+}
+
+// ---------------------------------------------------------------------
+// Requisição de insumos (almoxarifado)
+//   evento 'nova'  -> avisa o almoxarifado (administradores + responsáveis)
+//   'cancelada' pelo próprio solicitante -> avisa o almoxarifado
+//   demais eventos (em_analise, aprovada, separada, entregue, recusada, cancelada
+//   pelo almoxarifado) -> avisa quem pediu
+// ---------------------------------------------------------------------
+function avisarRequisicao_(uid, reqId, evento){
+  if(!reqId) return 0;
+  const r = lerDoc_('almox_requisicoes/' + reqId);
+  if(!r) return 0;
+  const num = 'REQ-' + ('0000' + (r.numero || 0)).slice(-4);
+  const almox = equipeAlmox_();
+  const souAlmox = almox.indexOf(uid) !== -1;
+  let n = 0;
+  if(evento === 'nova'){
+    if(r.criadoPor !== uid || r.status !== 'aberta') return 0;            // só quem pediu dispara
+    const urg = r.urgencia === 'urgente' ? ' · URGENTE' : '';
+    almox.filter(d => d !== uid).forEach(dest => {
+      n += enviar_(dest, { title: 'Nova requisição ' + num, body: (r.setor || '') + urg + ' · ' + (r.itens || []).length + ' item(ns) · ' + (r.criadoPorNome || ''), section: 'requisicao' });
+    });
+    return n;
+  }
+  if(evento === 'cancelada' && r.criadoPor === uid && r.status === 'cancelada'){
+    almox.filter(d => d !== uid).forEach(dest => {
+      n += enviar_(dest, { title: num + ' cancelada', body: 'Cancelada por ' + (r.criadoPorNome || 'solicitante') + ' (' + (r.setor || '') + ')', section: 'requisicao' });
+    });
+    return n;
+  }
+  if(!souAlmox || r.status !== evento || r.criadoPor === uid) return 0;    // só o almoxarifado dispara, e o status precisa bater
+  const textos = {
+    em_analise: 'O almoxarifado começou a analisar.',
+    aprovada: 'Aprovada. A quantidade foi reservada para o seu setor.',
+    separada: 'Separada. Pode retirar no almoxarifado.',
+    entregue: 'Entregue.',
+    recusada: 'Recusada' + (r.motivo ? ': ' + r.motivo : '.'),
+    cancelada: 'Cancelada pelo almoxarifado.'
+  };
+  if(!textos[evento]) return 0;
+  return enviar_(r.criadoPor, { title: num + ' · ' + (r.setor || ''), body: textos[evento], section: 'requisicao' });
+}
+
+// Administradores (documentos em admins/) + responsáveis cadastrados em almox_config/geral
+function equipeAlmox_(){
+  const ids = {};
+  listarIds_('admins').forEach(i => { ids[i] = 1; });
+  const cfg = lerDoc_('almox_config/geral') || {};
+  (cfg.uids || []).forEach(i => { ids[i] = 1; });
+  return Object.keys(ids);
+}
+function listarIds_(colecao){
+  const r = UrlFetchApp.fetch('https://firestore.googleapis.com/v1/projects/' + PROJECT_ID + '/databases/(default)/documents/' + colecao + '?pageSize=300&mask.fieldPaths=x', {
+    muteHttpExceptions: true, headers: { Authorization: 'Bearer ' + tokenAcesso_() }
+  });
+  if(r.getResponseCode() !== 200) return [];
+  return (JSON.parse(r.getContentText()).documents || []).map(d => d.name.split('/').pop());
 }
 
 function nomeDe_(uid){

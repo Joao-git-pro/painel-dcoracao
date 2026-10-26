@@ -39,3 +39,8 @@ de quem o publica (joao@dcoracaohome.com, que é dono do projeto d-coracao).
 
 Se mexer no Codigo.gs depois: Implantar > Gerenciar implantações > editar > Nova versão.
 Sem o servidor configurado, o painel funciona normal (avisos só com o painel aberto).
+
+
+ATUALIZAÇÃO (requisição de insumos): o Codigo.gs agora trata a ação 'requisicao' (avisa o almoxarifado
+quando chega requisição e o solicitante quando o status muda). Depois de colar o Codigo.gs novo:
+Implantar > Gerenciar implantações > editar (lápis) > Versão: Nova versão > Implantar. A URL /exec continua a mesma.
