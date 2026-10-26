@@ -3006,6 +3006,7 @@ function printCompletedDemands(){
   const rows = done.map(d => `
     <tr>
       <td>${escapeHtml(d.title)}</td>
+      <td>${escapeHtml(d.createdByName || '—')}</td>
       <td>${escapeHtml((d.assignedToNames || []).join(', '))}</td>
       <td>${d.deadline ? escapeHtml(formatDeadline(d.deadline)) : '—'}</td>
       <td>${d.startedAt ? escapeHtml(d.startedAt.toDate().toLocaleDateString('pt-BR')) : '—'}</td>
@@ -3022,7 +3023,7 @@ function printCompletedDemands(){
   </style></head><body>
   <h1>Demandas atendidas — ${new Date().toLocaleDateString('pt-BR')}</h1>
   <table>
-    <thead><tr><th>Título</th><th>Responsável</th><th>Prazo</th><th>Data de atendimento</th><th>Data de conclusão</th><th>Descrição</th></tr></thead>
+    <thead><tr><th>Título</th><th>Solicitante</th><th>Responsável</th><th>Prazo</th><th>Data de atendimento</th><th>Data de conclusão</th><th>Descrição</th></tr></thead>
     <tbody>${rows}</tbody>
   </table>
   </body></html>`;
@@ -3047,6 +3048,7 @@ function showDemandReportModal(){
           <button type="button" class="btn" data-quick="semana">Esta semana</button>
           <button type="button" class="btn" data-quick="mes">Este mês</button>
           <button type="button" class="btn" data-quick="mesant">Mês anterior</button>
+          <button type="button" class="btn" data-quick="tudo">Tudo</button>
         </div>
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
           <label style="flex:1;min-width:130px;font-size:12px;color:var(--ink-soft);">De<input id="repDe" type="date" /></label>
@@ -3071,7 +3073,8 @@ function showDemandReportModal(){
     hoje: () => setRange(hoje, hoje),
     semana: () => { const i = new Date(hoje); i.setDate(hoje.getDate() - ((hoje.getDay() + 6) % 7)); setRange(i, hoje); },
     mes: () => setRange(new Date(hoje.getFullYear(), hoje.getMonth(), 1), hoje),
-    mesant: () => setRange(new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1), new Date(hoje.getFullYear(), hoje.getMonth(), 0))
+    mesant: () => setRange(new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1), new Date(hoje.getFullYear(), hoje.getMonth(), 0)),
+    tudo: () => setRange(new Date(2020, 0, 1), hoje)
   };
   const lista = () => {
     const de = $('repDe').value, ate = $('repAte').value;
@@ -3910,8 +3913,7 @@ function buildSidebar(){
     byId('newDemandBtn').onclick = openNew;
     byId('demandsMenuBtn').onclick = e => openMenu(e.currentTarget, [
       { label: demandBoardView ? 'Ver em lista' : 'Ver em quadro (por status)', icon: demandBoardView ? listSvg : boardSvg, action: () => { demandBoardView = !demandBoardView; renderDemandsList(); } },
-      { label: 'Relatório por período', icon: printSvg, action: showDemandReportModal },
-      { label: 'Imprimir atendidas (todas)', icon: printSvg, action: printCompletedDemands },
+      { label: 'Imprimir relatório (por período)', icon: printSvg, action: showDemandReportModal },
       { label: 'Exportar Excel', icon: downloadSvg, action: exportCompletedDemandsExcel },
       { label: 'Exportar JSON', icon: downloadSvg, action: exportDemandsJSON }
     ]);
