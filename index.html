@@ -3033,6 +3033,115 @@ function printCompletedDemands(){
   w.onload = () => w.print();
 }
 
+// ---------- relatório de demandas por período (imprimir / Excel) ----------
+function dateInputValue(d){ return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function showDemandReportModal(){
+  const root = document.getElementById('modalRoot');
+  const hoje = new Date();
+  root.innerHTML = `
+    <div class="modal-bg" id="modalBg">
+      <div class="modal" style="max-width:420px;">
+        <h3>Relatório de demandas</h3>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
+          <button type="button" class="btn" data-quick="hoje">Hoje</button>
+          <button type="button" class="btn" data-quick="semana">Esta semana</button>
+          <button type="button" class="btn" data-quick="mes">Este mês</button>
+          <button type="button" class="btn" data-quick="mesant">Mês anterior</button>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+          <label style="flex:1;min-width:130px;font-size:12px;color:var(--ink-soft);">De<input id="repDe" type="date" /></label>
+          <label style="flex:1;min-width:130px;font-size:12px;color:var(--ink-soft);">Até<input id="repAte" type="date" /></label>
+        </div>
+        <label style="display:block;font-size:12px;color:var(--ink-soft);margin-bottom:10px;">Considerar a data de
+          <select id="repBase" class="f-input"><option value="conclusao">Conclusão</option><option value="criacao">Criação</option></select></label>
+        <label style="display:block;font-size:12px;color:var(--ink-soft);margin-bottom:10px;">Situação
+          <select id="repStatus" class="f-input"><option value="concluida">Concluídas</option><option value="todas">Todas</option><option value="abertas">Em aberto (abertas e em andamento)</option></select></label>
+        <div class="login-error" id="repErr"></div>
+        <div id="repCount" style="font-size:12.5px;color:var(--ink-soft);margin-bottom:8px;"></div>
+        <div class="actions">
+          <button class="cancel" id="repCancel">Fechar</button>
+          <button class="cancel" id="repXls">Exportar Excel</button>
+          <button class="confirm" id="repPrint">Imprimir</button>
+        </div>
+      </div>
+    </div>`;
+  const $ = id => document.getElementById(id);
+  const setRange = (a, b) => { $('repDe').value = dateInputValue(a); $('repAte').value = dateInputValue(b); update(); };
+  const quick = {
+    hoje: () => setRange(hoje, hoje),
+    semana: () => { const i = new Date(hoje); i.setDate(hoje.getDate() - ((hoje.getDay() + 6) % 7)); setRange(i, hoje); },
+    mes: () => setRange(new Date(hoje.getFullYear(), hoje.getMonth(), 1), hoje),
+    mesant: () => setRange(new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1), new Date(hoje.getFullYear(), hoje.getMonth(), 0))
+  };
+  const lista = () => {
+    const de = $('repDe').value, ate = $('repAte').value;
+    if(!de || !ate) return { erro: 'Escolha as duas datas.' };
+    const ini = new Date(de + 'T00:00:00').getTime(), fim = new Date(ate + 'T23:59:59.999').getTime();
+    if(ini > fim) return { erro: 'A data inicial é depois da final.' };
+    const base = $('repBase').value, st = $('repStatus').value;
+    const itens = myDemands.filter(d => {
+      if(st === 'concluida' && d.status !== 'concluida') return false;
+      if(st === 'abertas' && !(d.status === 'aberta' || d.status === 'em_andamento')) return false;
+      const t = base === 'conclusao' ? (d.completedAt ? d.completedAt.toMillis() : null) : (d.createdAt ? d.createdAt.toMillis() : null);
+      return t !== null && t >= ini && t <= fim;
+    }).sort((a, b) => {
+      const ka = base === 'conclusao' ? (a.completedAt ? a.completedAt.toMillis() : 0) : (a.createdAt ? a.createdAt.toMillis() : 0);
+      const kb = base === 'conclusao' ? (b.completedAt ? b.completedAt.toMillis() : 0) : (b.createdAt ? b.createdAt.toMillis() : 0);
+      return ka - kb;
+    });
+    return { itens, de, ate, base, st };
+  };
+  const update = () => {
+    const r = lista();
+    $('repErr').textContent = r.erro || '';
+    $('repCount').textContent = r.erro ? '' : `${r.itens.length} demanda(s) no período.`;
+  };
+  ['repDe', 'repAte', 'repBase', 'repStatus'].forEach(id => { $(id).onchange = update; });
+  root.querySelectorAll('[data-quick]').forEach(b => { b.onclick = () => quick[b.getAttribute('data-quick')](); });
+  quick.mes();
+  const close = () => { root.innerHTML = ''; };
+  $('repCancel').onclick = close;
+  $('modalBg').onclick = e => { if(e.target.id === 'modalBg') close(); };
+  const fmt = t => t ? t.toDate().toLocaleDateString('pt-BR') : '—';
+  const br = s => s.split('-').reverse().join('/');
+  const tituloRel = r => ({ concluida: 'Demandas concluídas', todas: 'Demandas', abertas: 'Demandas em aberto' }[r.st]) + ' — ' + br(r.de) + ' a ' + br(r.ate);
+  $('repPrint').onclick = () => {
+    const r = lista(); if(r.erro){ $('repErr').textContent = r.erro; return; }
+    if(!r.itens.length){ $('repErr').textContent = 'Nenhuma demanda nesse período.'; return; }
+    const resumo = {}; r.itens.forEach(d => { resumo[d.status] = (resumo[d.status] || 0) + 1; });
+    const linhas = r.itens.map(d => `<tr>
+      <td>${escapeHtml(d.title)}</td><td>${escapeHtml(d.createdByName || '—')}</td><td>${escapeHtml((d.assignedToNames || []).join(', '))}</td>
+      <td>${escapeHtml(statusLabel(d.status))}</td><td>${fmt(d.createdAt)}</td><td>${d.deadline ? escapeHtml(formatDeadline(d.deadline)) : '—'}</td>
+      <td>${fmt(d.startedAt)}</td><td>${fmt(d.completedAt)}</td><td>${escapeHtml(d.description || '')}</td></tr>`).join('');
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(tituloRel(r))}</title>
+    <style>@page{size:A4 landscape;margin:12mm;}body{font-family:Arial,sans-serif;color:#222;margin:0;}h1{font-size:17px;margin:0 0 4px;}
+    .sub{font-size:12px;color:#555;margin-bottom:10px;}table{width:100%;border-collapse:collapse;}
+    th,td{border:1px solid #ccc;padding:5px 7px;font-size:11px;text-align:left;vertical-align:top;}th{background:#eee;}tr{page-break-inside:avoid;}</style></head><body>
+    <h1>D Coração Home · ${escapeHtml(tituloRel(r))}</h1>
+    <div class="sub">Pela data de ${r.base === 'conclusao' ? 'conclusão' : 'criação'} · ${r.itens.length} demanda(s) · ${Object.keys(resumo).map(k => escapeHtml(statusLabel(k)) + ': ' + resumo[k]).join(' · ')} · emitido em ${new Date().toLocaleDateString('pt-BR')}</div>
+    <table><thead><tr><th>Título</th><th>Solicitante</th><th>Responsável</th><th>Situação</th><th>Criada</th><th>Prazo</th><th>Atendimento</th><th>Conclusão</th><th>Descrição</th></tr></thead><tbody>${linhas}</tbody></table>
+    </body></html>`;
+    const w = window.open('', '_blank');
+    if(!w){ $('repErr').textContent = 'Permita pop-ups para imprimir.'; return; }
+    w.document.write(html); w.document.close(); w.onload = () => w.print();
+  };
+  $('repXls').onclick = () => {
+    const r = lista(); if(r.erro){ $('repErr').textContent = r.erro; return; }
+    if(!r.itens.length){ $('repErr').textContent = 'Nenhuma demanda nesse período.'; return; }
+    loadSheetJS().then(() => {
+      const rows = r.itens.map(d => ({
+        'Título': d.title, 'Solicitante': d.createdByName || '', 'Responsável(is)': (d.assignedToNames || []).join(', '),
+        'Situação': statusLabel(d.status), 'Criada em': d.createdAt ? d.createdAt.toDate().toLocaleDateString('pt-BR') : '',
+        'Prazo': d.deadline ? formatDeadline(d.deadline) : '', 'Data de atendimento': d.startedAt ? d.startedAt.toDate().toLocaleDateString('pt-BR') : '',
+        'Data de conclusão': d.completedAt ? d.completedAt.toDate().toLocaleDateString('pt-BR') : '', 'Descrição': d.description
+      }));
+      const ws = XLSX.utils.json_to_sheet(rows); const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Demandas');
+      XLSX.writeFile(wb, `demandas-${r.de}-a-${r.ate}.xlsx`);
+    }).catch(e => { $('repErr').textContent = e.message; });
+  };
+}
+
 function loadSheetJS(){
   return new Promise((resolve, reject) => {
     if(window.XLSX){ resolve(); return; }
@@ -3801,7 +3910,8 @@ function buildSidebar(){
     byId('newDemandBtn').onclick = openNew;
     byId('demandsMenuBtn').onclick = e => openMenu(e.currentTarget, [
       { label: demandBoardView ? 'Ver em lista' : 'Ver em quadro (por status)', icon: demandBoardView ? listSvg : boardSvg, action: () => { demandBoardView = !demandBoardView; renderDemandsList(); } },
-      { label: 'Imprimir atendidas', icon: printSvg, action: printCompletedDemands },
+      { label: 'Relatório por período', icon: printSvg, action: showDemandReportModal },
+      { label: 'Imprimir atendidas (todas)', icon: printSvg, action: printCompletedDemands },
       { label: 'Exportar Excel', icon: downloadSvg, action: exportCompletedDemandsExcel },
       { label: 'Exportar JSON', icon: downloadSvg, action: exportDemandsJSON }
     ]);
