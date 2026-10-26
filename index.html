@@ -4658,7 +4658,7 @@ function renderDemandRow(d){
   const pinned = d.pinned && d.pinned[myUid];
   const whoLine = isAdmin
     ? `${d.createdByName || '—'} → ${(d.assignedToNames || []).join(', ') || '—'}`
-    : (d.createdBy === myUid ? `para ${(d.assignedToNames || []).join(', ') || '—'}` : `de ${d.createdByName || '—'}`);
+    : (d.createdBy === myUid ? ((d.assignedTo || []).length === 1 && d.assignedTo[0] === myUid ? 'para mim' : `para ${(d.assignedToNames || []).join(', ') || '—'}`) : `de ${d.createdByName || '—'}`);
   const iCreated = d.createdBy === myUid;
   const avName = iCreated ? ((d.assignedToNames || [])[0] || '?') : (d.createdByName || '?');
   const avKey = iCreated ? ((d.assignedTo || [])[0] || avName) : (d.createdBy || avName);
@@ -4747,17 +4747,24 @@ function renderNewDemandForm(main){
   if(unsubDemandUpdates){ unsubDemandUpdates(); unsubDemandUpdates = null; }
   const others = allUsers.filter(u => u.uid !== myUid && !u.blocked)
     .sort((a, b) => displayNameFor(a).toLowerCase().localeCompare(displayNameFor(b).toLowerCase()));
+  const meuRegistro = allUsers.find(u => u.uid === myUid) || { uid: myUid, email: (auth.currentUser && auth.currentUser.email) || '', chatName: myChatName };
   main.innerHTML = `
     <div class="pane-head">
       <button class="head-btn back-btn" id="newDemandBack" title="Voltar" aria-label="Voltar">${backSvg}</button>
       <div class="avatar sm square" style="--av:var(--accent)">${plusSvg}</div>
-      <div class="pane-titles"><div class="pane-title">Nova demanda</div><div class="pane-sub">Peça algo para uma ou mais pessoas da equipe</div></div>
+      <div class="pane-titles"><div class="pane-title">Nova demanda</div><div class="pane-sub">Peça algo para a equipe ou crie uma tarefa só para você</div></div>
     </div>
     <div class="pane-body"><div class="form-pane">
       <div class="field">
-        <label class="f-label">Para quem é a demanda? <span class="f-hint">(pode marcar mais de uma pessoa)</span></label>
+        <label class="f-label">Para quem é a demanda? <span class="f-hint">(pode marcar mais de uma pessoa, inclusive você)</span></label>
         ${others.length > 6 ? `<label class="search-box sm">${searchIconSvg}<input id="assigneeFilter" type="search" placeholder="Filtrar pessoas…" autocomplete="off" /></label>` : ''}
         <div class="assignee-box" id="demandAssigneeList">
+          ${meuRegistro ? `
+            <label class="assignee-row" data-name="eu mesmo para mim ${escapeAttr(displayNameFor(meuRegistro).toLowerCase())}">
+              <input type="checkbox" value="${myUid}" class="demand-assignee-check" id="demandForMe" />
+              ${avatarHtml(displayNameFor(meuRegistro), myUid, { cls: 'xs' })}
+              <span><b>Para mim</b> · ${escapeHtml(displayNameFor(meuRegistro))}</span>
+            </label>` : ''}
           ${others.length ? others.map(u => `
             <label class="assignee-row" data-name="${escapeAttr(displayNameFor(u).toLowerCase() + ' ' + (u.email || '').toLowerCase())}">
               <input type="checkbox" value="${u.uid}" class="demand-assignee-check" />
