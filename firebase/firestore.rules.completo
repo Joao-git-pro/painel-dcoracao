@@ -14,6 +14,7 @@ rules_version = '2';
 //  - Demandas: criador, responsáveis e admin.
 //  - Grupos e registro de atividade: só admin.
 //  - Almoxarifado (requisição de insumos) e setores: ver os blocos ao final.
+//  - Home: mural de comunicados (config/home e announcements) — todos leem; só admin e grupos liberados publicam.
 // =====================================================================
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -146,6 +147,38 @@ service cloud.firestore {
     match /config/setores {
       allow read: if ok();
       allow write: if isAdmin();
+    }
+
+    // ---------- Home: mural de comunicados ----------
+    // config/home guarda os grupos (além dos administradores) que podem publicar: { publishGroups: [idDoGrupo, ...] }
+    // Só o administrador altera (botão "quem pode publicar" no mural). Mesma regra de homeCanPublish() no painel.
+    function homeCfg() {
+      return exists(/databases/$(database)/documents/config/home)
+        ? get(/databases/$(database)/documents/config/home).data
+        : {};
+    }
+    function canPublish() {
+      return isAdmin() || (signedIn() && homeCfg().get('publishGroups', []).hasAny(myGroups()));
+    }
+    match /config/home {
+      allow read: if ok();
+      allow write: if isAdmin();
+    }
+    // Todos leem. Publicar, editar e excluir: só administradores e grupos liberados acima.
+    // Qualquer pessoa pode apenas confirmar a PRÓPRIA leitura (adiciona só a sua chave em readBy, com a hora do servidor).
+    match /announcements/{aid} {
+      allow read: if ok();
+      allow create: if ok() && canPublish()
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 140
+        && request.resource.data.body is string && request.resource.data.body.size() <= 5000;
+      allow update: if ok() && (
+        canPublish() ||
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readBy'])
+         && request.resource.data.readBy.diff(resource.data.get('readBy', {})).affectedKeys().hasOnly([request.auth.uid])
+         && request.resource.data.readBy[request.auth.uid] == request.time)
+      );
+      allow delete: if ok() && canPublish();
     }
 
     // ---------- almoxarifado / requisição de insumos ----------

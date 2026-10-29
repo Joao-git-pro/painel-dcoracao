@@ -21,6 +21,16 @@ NOTIFICAÇÕES COM O APP FECHADO
 - Veja o arquivo CONFIGURAR-NOTIFICACOES.txt (passo a passo; usa o Apps Script da pasta apps-script).
 - Enquanto o push-config.js estiver vazio, o painel funciona como antes.
 
+HOME (PÁGINA INICIAL)
+- Depois do login a pessoa cai na Home (botão "Início"). Planilhas, Conversas, Demandas etc. continuam no menu lateral.
+- Mural da Diretoria: todos leem e confirmam leitura. Só ADMINISTRADORES e os grupos liberados publicam, editam e excluem.
+- Para liberar a Diretoria: entre como administrador, na Home toque no ícone de pessoas do mural ("Quem pode publicar") e marque o grupo Diretoria.
+- ANTES DE USAR: publique firebase/firestore.rules.completo em Firebase > Firestore Database > Regras > Publicar
+  (novos blocos: config/home e announcements). Sem isso o mural mostra um aviso e o resto da Home funciona normal.
+- Favoritos, Abertas recentemente, Suas pendências (Demandas atribuídas a você) e Novidades (planilhas/abas novas ou atualizadas
+  nos últimos 30 dias) usam os dados que o painel já tinha. A busca procura em planilhas, POPs, documentos e abas (setores).
+- Demandas: menu ⋮ > "Editar título e descrição" e lápis ao lado de cada item do checklist.
+
 O QUE NÃO MUDA
-- Firebase, coleções e regras de segurança continuam iguais.
+- Firebase e as coleções que já existiam continuam iguais (as regras ganharam só os blocos da Home).
 - Notificação com o app FECHADO: ver CONFIGURAR-NOTIFICACOES.txt.

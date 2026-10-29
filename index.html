@@ -962,6 +962,156 @@
   .req-foto{width:64px; height:64px; border-radius:10px; object-fit:cover; background:var(--surface-2); flex-shrink:0;}
   #reqSetorBox{padding:6px 0 2px;}
   #reqSetorBox select{width:100%;}
+
+  /* =================================================================
+     HOME (página inicial): mural, favoritos, acessos recentes, pendências e novidades
+     Usa só as variáveis do tema (marrom/preto no estilo D Coração).
+     ================================================================= */
+  #app[data-section="home"] .sidebar{display:none;}
+  #app[data-section="home"] .main{grid-column:2 / span 2;}
+  .home-pane{flex:1; overflow-y:auto; min-height:0; background:var(--bg); scrollbar-width:thin; scrollbar-color:var(--line) transparent; overscroll-behavior:contain;}
+  .home{max-width:1160px; margin:0 auto; padding:28px 28px 44px; display:flex; flex-direction:column; gap:22px;}
+  .home-top{display:flex; align-items:flex-end; justify-content:space-between; gap:16px; flex-wrap:wrap;}
+  .home-date{font-size:13.5px; color:var(--ink-soft);}
+  .home-hello{font-size:30px; font-weight:800; letter-spacing:-.02em; margin:2px 0 0; color:var(--ink); line-height:1.15;}
+  .home-search{position:relative; flex:1 1 280px; max-width:460px;}
+  .home-search .search-box{height:44px; background:var(--surface); border:1px solid var(--line);}
+  .home-search .search-box:focus-within{border-color:var(--accent);}
+  .home-results{position:absolute; left:0; right:0; top:calc(100% + 6px); z-index:30; background:var(--surface); border:1px solid var(--line); border-radius:14px; box-shadow:0 14px 40px rgba(0,0,0,.22); max-height:min(60vh, 440px); overflow-y:auto; padding:6px;}
+  .home-results .h-sec{font-size:11px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-soft); padding:8px 10px 4px;}
+  .home-results .h-none{padding:14px 12px; font-size:13.5px; color:var(--ink-soft);}
+
+  .h-card{background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:16px 18px; min-width:0;}
+  .h-head{display:flex; align-items:center; gap:10px; margin-bottom:12px;}
+  .h-title{font-size:17px; font-weight:800; margin:0; flex:1; min-width:0; color:var(--ink); letter-spacing:-.01em;}
+  .h-count{font-size:11.5px; font-weight:800; padding:2px 9px; border-radius:999px; background:var(--accent-soft); color:var(--accent-strong);}
+  .h-count.hot{background:rgba(193,80,61,.14); color:var(--danger);}
+  .h-empty{font-size:13.5px; color:var(--ink-soft); line-height:1.5; padding:6px 2px 4px;}
+  .btn.sm{height:36px; padding:0 14px; font-size:13px; border-radius:9px;}
+
+  /* ---- Mural da Diretoria ---- */
+  .home-mural{background:var(--accent-soft); border:1px solid var(--line); border-radius:18px; padding:18px;}
+  .mural-head{display:flex; align-items:center; gap:12px; margin-bottom:14px; flex-wrap:wrap;}
+  .mural-ico{width:42px; height:42px; border-radius:12px; background:var(--accent); color:var(--accent-ink); display:flex; align-items:center; justify-content:center; flex-shrink:0;}
+  .mural-ico svg{width:20px; height:20px;}
+  .mural-titles{flex:1 1 200px; min-width:0;}
+  .mural-titles h2{margin:0; font-size:19px; font-weight:800; color:var(--ink); letter-spacing:-.01em;}
+  .mural-titles p{margin:1px 0 0; font-size:13px; color:var(--ink-soft);}
+  .mural-actions{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+  .mural-grid{display:grid; grid-template-columns:minmax(0,1.75fr) minmax(0,1fr); gap:12px;}
+  .mural-hero{background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:18px 20px; display:flex; flex-direction:column; gap:10px; min-width:0;}
+  .mural-tags{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
+  .mural-tag{font-size:11.5px; font-weight:800; padding:3px 11px; border-radius:999px; letter-spacing:.01em;}
+  .mural-tag.importante{background:var(--danger); color:#fff;}
+  .mural-tag.aviso{background:var(--warn); color:#fff;}
+  .mural-tag.informativo{background:var(--accent-soft); color:var(--accent-strong); border:1px solid var(--line);}
+  .mural-pin{font-size:12.5px; color:var(--ink-soft); display:inline-flex; align-items:center; gap:4px;}
+  .mural-pin svg{width:12px; height:12px;}
+  .mural-tags .card-btn{margin-left:auto; color:var(--ink-soft);}
+  .mural-title{font-size:21px; font-weight:800; margin:0; color:var(--ink); line-height:1.25; letter-spacing:-.01em; overflow-wrap:anywhere;}
+  .mural-body{font-size:14.5px; line-height:1.55; color:var(--ink); white-space:pre-wrap; overflow-wrap:anywhere;}
+  .mural-body.clamp{display:-webkit-box; -webkit-line-clamp:6; -webkit-box-orient:vertical; overflow:hidden;}
+  .mural-body a{color:var(--link);}
+  .mural-foot{display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-top:auto; padding-top:6px;}
+  .mural-by{font-size:12.5px; color:var(--ink-soft);}
+  .mural-by .text-link{font-size:12.5px; font-weight:600; text-decoration:underline;}
+  .read-ok{display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:700; color:var(--ok);}
+  .read-ok svg{width:16px; height:16px;}
+  .mural-side{display:flex; flex-direction:column; gap:12px; min-width:0;}
+  .mural-mini{all:unset; box-sizing:border-box; cursor:pointer; background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:13px 15px; display:flex; flex-direction:column; gap:4px; min-width:0; flex:1;}
+  .mural-mini:hover, .mural-mini:focus-visible{border-color:var(--accent);}
+  .mini-date{font-size:12px; color:var(--ink-soft);}
+  .mini-title{font-size:15px; font-weight:800; color:var(--ink); line-height:1.3; overflow-wrap:anywhere; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;}
+  .mini-sum{font-size:13px; color:var(--ink-soft); line-height:1.4; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;}
+  .mini-flag{font-size:11.5px; font-weight:800; color:var(--danger); margin-top:2px;}
+  .mural-empty{background:var(--surface); border:1px dashed var(--line); border-radius:14px; padding:20px; font-size:14px; color:var(--ink-soft); line-height:1.55; text-align:center;}
+  .mural-empty b{color:var(--ink);}
+  .mural-empty .text-link{font-size:13.5px;}
+
+  /* ---- Favoritos ---- */
+  .fav-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:12px;}
+  .fav-card{display:flex; flex-direction:column; gap:12px; background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:14px 14px 13px; text-decoration:none; color:inherit; min-width:0; transition:border-color .12s, transform .12s;}
+  .fav-card:hover, .fav-card:focus-visible{border-color:var(--accent); outline:none; transform:translateY(-1px);}
+  .fav-top{display:flex; align-items:center; justify-content:space-between;}
+  .fav-top .card-btn{width:32px; height:32px; margin:-4px -4px 0 0;}
+  .fav-name{font-size:15px; font-weight:700; color:var(--ink); line-height:1.3; overflow-wrap:anywhere; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;}
+  .fav-sub{font-size:12.5px; color:var(--ink-soft); margin-top:-6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+
+  /* ---- Linhas (recentes, novidades, busca) ---- */
+  .home-grid{display:grid; grid-template-columns:minmax(0,1.6fr) minmax(0,1fr); gap:16px; align-items:start;}
+  .home-side{display:flex; flex-direction:column; gap:16px; min-width:0;}
+  .h-row{all:unset; box-sizing:border-box; display:flex; align-items:center; gap:12px; width:100%; padding:10px 8px; border-radius:10px; cursor:pointer; color:var(--ink); text-decoration:none; border-bottom:1px solid var(--line);}
+  .h-row:last-child{border-bottom:0;}
+  .h-row:hover, .h-row:focus-visible{background:var(--row-hover);}
+  .h-row .file-ico{width:36px; height:36px; border-radius:10px;}
+  .h-row .file-ico svg{width:19px; height:19px;}
+  .h-row-main{flex:1; min-width:0; display:flex; flex-direction:column;}
+  .h-row-title{font-size:14.5px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .h-row-sub{font-size:12.5px; color:var(--ink-soft); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:1px;}
+  .h-row-time{font-size:12.5px; color:var(--ink-soft); flex-shrink:0;}
+  .home-results .h-row{border-bottom:0;}
+
+  /* ---- Pendências ---- */
+  .pend{display:flex; align-items:flex-start; gap:11px; padding:10px 4px; border-bottom:1px solid var(--line); cursor:pointer; border-radius:8px;}
+  .pend:last-of-type{border-bottom:0;}
+  .pend:hover{background:var(--row-hover);}
+  .pend-check{all:unset; box-sizing:border-box; width:20px; height:20px; border:2px solid var(--ink-soft); border-radius:6px; flex-shrink:0; margin-top:1px; cursor:pointer; opacity:.8;}
+  .pend-check:hover, .pend-check:focus-visible{border-color:var(--accent); background:var(--accent-soft); opacity:1;}
+  .pend-main{flex:1; min-width:0;}
+  .pend-title{font-size:14.5px; font-weight:700; color:var(--ink); line-height:1.3; overflow-wrap:anywhere;}
+  .pend-meta{font-size:12.5px; color:var(--ink-soft); margin-top:2px;}
+  .pend-meta .due{font-weight:800;}
+  .pend-meta .due.late, .pend-meta .due.today{color:var(--danger);}
+  .pend-meta .due.soon{color:var(--warn);}
+  .h-foot{margin-top:8px;}
+
+  .news{display:flex; gap:11px; align-items:flex-start; padding:9px 4px; border-bottom:1px solid var(--line); text-decoration:none; color:inherit; cursor:pointer; border-radius:8px; width:100%; box-sizing:border-box;}
+  button.news{all:unset; box-sizing:border-box; display:flex; gap:11px; align-items:flex-start; padding:9px 4px; border-bottom:1px solid var(--line); cursor:pointer; border-radius:8px; width:100%; color:var(--ink);}
+  .news:last-child, button.news:last-child{border-bottom:0;}
+  .news:hover, button.news:hover{background:var(--row-hover);}
+  .news-dot{width:9px; height:9px; border-radius:50%; flex-shrink:0; margin-top:6px; background:var(--accent);}
+  .news-dot.new{background:var(--ok);}
+  .news-dot.cat{background:var(--warn);}
+  .news-main{flex:1; min-width:0;}
+  .news-title{font-size:14px; font-weight:700; color:var(--ink); line-height:1.3; overflow-wrap:anywhere;}
+  .news-sub{font-size:12.5px; color:var(--ink-soft); margin-top:2px;}
+
+  /* ---- Janela de comunicados ---- */
+  .ann-full{background:var(--surface-2); border:1px solid var(--line); border-radius:12px; padding:14px 15px; margin-bottom:10px;}
+  .ann-full.focus{border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-soft);}
+  .ann-full .mural-title{font-size:17px; margin:8px 0 6px;}
+  .ann-full .mural-body{font-size:14px;}
+  .ann-tools{display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; padding-top:10px; border-top:1px solid var(--line);}
+  .ann-tools .text-link{font-size:12.5px;}
+  .reader-row{display:flex; align-items:center; gap:10px; padding:7px 4px; font-size:13.5px; border-bottom:1px solid var(--line);}
+  .reader-row:last-child{border-bottom:0;}
+  .reader-row .grow{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .reader-row .ok{color:var(--ok); font-weight:700; font-size:12.5px;}
+  .reader-row .wait{color:var(--ink-soft); font-size:12.5px;}
+  .modal label.f-label{margin:2px 0 6px;}
+  .modal textarea.f-input{margin-bottom:12px;}
+
+  @media (max-width:980px){
+    .mural-grid, .home-grid{grid-template-columns:minmax(0,1fr);}
+  }
+  @media (max-width:768px), (pointer:coarse) and (max-height:520px){
+    #app[data-section="home"] .main{grid-column:1; grid-row:1; display:flex;}
+    .home{padding:calc(16px + env(safe-area-inset-top)) 14px 24px; gap:18px;}
+    .home-hello{font-size:25px;}
+    .home-search{flex-basis:100%; max-width:none;}
+    .home-mural{padding:14px; border-radius:16px;}
+    .mural-hero{padding:15px;}
+    .mural-title{font-size:19px;}
+    .fav-grid{grid-template-columns:repeat(2, minmax(0,1fr)); gap:10px;}
+    .h-card{padding:14px;}
+    .mural-actions{width:100%;}
+    .mural-actions .btn{flex:1;}
+  }
+  @media (max-width:440px){
+    .rail-label{font-size:10px !important;}
+    .rail-ico, html[data-skin="discord"] .rail-ico{width:44px !important;}
+  }
+
 </style>
 </head>
 <body>
@@ -988,11 +1138,19 @@
   </div>
 
   <!-- APP: barra de seções | lista | painel -->
-  <div id="app" class="hidden" data-section="sheets">
+  <div id="app" class="hidden" data-section="home">
     <nav class="rail" id="rail" aria-label="Seções">
       <div class="rail-logo"><img id="railLogo" src="data:image/jpeg;base64,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L8vTjrbHqMHzknUZIvkm0eX4ViPyRdNjnHjitu/e342mX5u7t5KaNdWwYtqaK6q8AYDJqarTxEkYHChxgHnMY7xWl4n/AHV2/HdnJjm16TH+20zPzjZ6tzt5KUrv0mrVzpdTwMWqwbKLqie7vRWIDcmZXTI4kbGQRg+8OSsVnHffhtt3d8THV5zYrWtGTHtxV37+60T0nwZH/wCINPo6bq9Jqb9TbfU1Adq209FFNn6Xgqax2a518AYhVQMxGSZt9rTHWYx2m0zG2/OIj0ie6Wn2V8totkrWsRO+3KZn1mI7nTuVvXXptDtWkki3V1aaqlQCQwFlnfZI5KBW56kZzyyZ4w5YpjyVn/dEQ9ZsU3y47dKzO/05PJ2dbyppLrrXJXOj1VVeASe9sq4a+nTxfWOAJ50uSMczM/8AGY+r3qsc5IiI/wCVfpDp7Ptv16bUZu4u4tpv01xQZcV31NUWUfWKkh8eYBA6zzgyRS/Pu2mJ+cPeoxzenLviYmPDlMfeHdtva9FWnOj0bvYljB9VqXTumvKZ7qpK+JmSmskv4m4nsOTgKs9XvWK8GPeY75t3b7dIh4pjvN+PLtE9K777ecz4/kz2394dnXX/AJQsN1tzpUz6A18Ff0hK1rYvqOI8WnJTj4UTjYHhPDkzfe+K1vaTM78vd6bxG3zjyRqY81a+yiIiOfvb89t9+7x5+iC7a2zZqLXutPFZY3ExxgegVQOSqqgKqjkFAHlIN7zeeKf88vRY0xxjrFY6PFNbYQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBATLBMMkMEyyQEBDBMMkBMhMBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQP/2Q==" alt="D Coração Home" /></div>
 
-      <button class="rail-btn active" data-section="sheets" title="Planilhas">
+      <button class="rail-btn active" data-section="home" title="Início">
+        <span class="rail-ico">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"></path><path d="M5 10v10h14V10"></path><path d="M10 20v-6h4v6"></path></svg>
+          <span class="rail-badge" id="homeBadge" style="display:none;">0</span>
+        </span>
+        <span class="rail-label">Início</span>
+      </button>
+
+      <button class="rail-btn" data-section="sheets" title="Planilhas">
         <span class="rail-ico">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M3 9h18M3 15h18M9 3v18"></path></svg>
           <span class="rail-dot hidden" id="sheetsDot"></span>
@@ -1122,7 +1280,7 @@ let unsubMyAdmin = null;
 let lastAdminUids = new Set(); // admins vistos pela última vez na janela "gerenciar usuários"
 let usersSig = '';             // assinatura da lista de usuários (ignora online/visto, que mudam toda hora)
 // ---- estado da nova interface (estilo mensageiro) ----
-let section = 'sheets';        // seção aberta: 'sheets' (Planilhas) | 'chats' | 'demands' | 'admin' | 'settings'
+let section = 'home';          // seção aberta: 'sheets' (Planilhas) | 'chats' | 'demands' | 'admin' | 'settings'
 let mainOpen = false;          // celular: true quando a tela de detalhe (aba, conversa, demanda) está aberta
 let chatSidebarMode = 'list';  // 'list' (conversas) | 'new' (escolher pessoa para nova conversa)
 let convFilter = 'all';        // filtro da lista de conversas: 'all' | 'unread' | 'muted' | 'archived'
@@ -1131,6 +1289,12 @@ let sheetsSig = '';            // evita redesenhar Planilhas quando nada visíve
 let typingTimer = null;
 let listTypingTimer = null;
 let lastReadWrite = {};        // trava para não gravar "lido" várias vezes seguidas
+// ---- Home (página inicial) ----
+let homeAnnouncements = [];    // comunicados do mural
+let homeCfg = { publishGroups: [] }; // grupos (além dos admins) que podem publicar no mural
+let homeBlocked = false;       // true quando o Firestore recusou ler o mural (regras ainda não publicadas)
+let myRecents = [];            // [{k:'catId_linkId', t:ms}] acessos recentes desta pessoa
+let unsubAnn = null, unsubHomeCfg = null, homeTimer = null, homeSearchQ = '';
 
 const trashSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path></svg>`;
 const lockSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>`;
@@ -1277,7 +1441,8 @@ auth.onAuthStateChanged(async user => {
     Object.values(linkUnsubs).forEach(u => u());
     linkUnsubs = {};
     // limpa a interface para o próximo login
-    section = 'sheets'; mainOpen = false; chatSidebarMode = 'list'; convFilter = 'all'; convSearchQuery = '';
+    stopHome();
+    section = 'home'; mainOpen = false; chatSidebarMode = 'list'; convFilter = 'all'; convSearchQuery = '';
     searchQuery = ''; demandSearchQuery = ''; sheetsSig = ''; mainKey = '';
     closeMenu(); closeEmojiPanel();
     document.getElementById('modalRoot').innerHTML = '';
@@ -1356,6 +1521,7 @@ auth.onAuthStateChanged(async user => {
     myPinnedCats = data.pinnedCats || [];
     myLastSeenCat = data.lastSeenCat || {};
     myChatName = data.chatName || '';
+    myRecents = Array.isArray(data.recentOpens) ? data.recentOpens.filter(r => r && typeof r.k === 'string' && typeof r.t === 'number').slice(0, 12) : [];
     updateMyNameUI();
     const shouldForce = data.mustChangePassword === true;
     if(shouldForce && !mustChangePassword) showForcePasswordModal();
@@ -1368,6 +1534,7 @@ auth.onAuthStateChanged(async user => {
   listenConversations();
   listenDemands();
   listenCategories();
+  listenHome();
   listenRequisicao();
   startPresence();
 });
@@ -1405,6 +1572,7 @@ function listenUsersDirectory(){
   unsubUsers = db.collection('users').onSnapshot(snap => {
     allUsers = snap.docs.map(mapUserDoc);
     refreshChatsUI();
+    scheduleHome();
   }, err => reportListenError('usuários', err));
 }
 
@@ -1475,6 +1643,7 @@ function listenCategories(){
         order: doc.data().order || 0,
         allowedUsers: doc.data().allowedUsers || [],
         allowedGroups: doc.data().allowedGroups || [],
+        createdAtMillis: tsMs(doc.data().createdAt),
         links: existing ? existing.links : []
       });
     });
@@ -1526,7 +1695,7 @@ function listenLinks(catId){
     .onSnapshot(snap => {
       const cat = categories.find(c => c.id === catId);
       if(!cat) return;
-      const links = snap.docs.map(d => ({ id: d.id, title: d.data().title, url: d.data().url, order: d.data().order || 0, createdAtMillis: d.data().createdAt ? d.data().createdAt.toMillis() : Date.now() }));
+      const links = snap.docs.map(d => ({ id: d.id, title: d.data().title, url: d.data().url, order: d.data().order || 0, createdAtMillis: d.data().createdAt ? d.data().createdAt.toMillis() : Date.now(), updatedAtMillis: tsMs(d.data().updatedAt) }));
       links.sort((a, b) => a.order - b.order);
       cat.links = links;
       render();
@@ -1660,7 +1829,7 @@ function editLink(catId, linkId, title, url){
   let finalUrl = url.trim();
   if(!/^https?:\/\//i.test(finalUrl)) finalUrl = 'https://' + finalUrl;
   db.collection('categories').doc(catId).collection('links').doc(linkId).update({
-    title: title.trim(), url: finalUrl
+    title: title.trim(), url: finalUrl, updatedAt: firebase.firestore.FieldValue.serverTimestamp()
   }).then(() => logActivity('editou o link', title.trim()))
   .catch(err => alert('Erro ao editar link: ' + errMsg(err)));
 }
@@ -2657,6 +2826,7 @@ function sortAndRenderDemands(){
     return at - bt;
   });
   updateDemandsBadge();
+  scheduleHome();
   renderDemandsList();
   if(demandView && demandView.type === 'detail'){
     // a demanda aberta foi excluída/reatribuída por outra pessoa → fecha
@@ -2895,14 +3065,20 @@ function deleteDemandPermanently(demandId){
 function patchDemandChecklistUI(demandId, checklist){
   const box = document.getElementById('demandChecklist');
   if(!box) return;
+  const dm = myDemands.find(x => x.id === demandId);
+  const canEdit = !!dm && canEditDemandText(dm);
   box.innerHTML = checklist.map(c => `
     <label class="checklist-row" style="${c.done ? 'opacity:.6;text-decoration:line-through;' : ''}">
       <input type="checkbox" data-checkid="${c.id}" ${c.done ? 'checked' : ''} />
       <span style="flex:1;">${escapeHtml(c.text)}</span>
+      ${canEdit ? `<button data-editcheck="${c.id}" title="Editar texto" aria-label="Editar texto" style="background:none;border:none;cursor:pointer;opacity:.6;padding:0 2px;">${editSvg.replace('<svg ', '<svg style="width:12px;height:12px;" ')}</button>` : ''}
       <button data-delcheck="${c.id}" style="background:none;border:none;cursor:pointer;opacity:.6;padding:0;">${trashSvg.replace('<svg ', '<svg style="width:11px;height:11px;" ')}</button>
     </label>`).join('');
   box.querySelectorAll('[data-checkid]').forEach(cb => {
     cb.onchange = () => toggleDemandChecklistItem(demandId, checklist, cb.getAttribute('data-checkid'), cb.checked);
+  });
+  box.querySelectorAll('[data-editcheck]').forEach(btn => {
+    btn.onclick = e => { e.preventDefault(); e.stopPropagation(); startEditChecklistItem(demandId, btn.getAttribute('data-editcheck')); };
   });
   box.querySelectorAll('[data-delcheck]').forEach(btn => {
     btn.onclick = () => removeDemandChecklistItem(demandId, checklist, btn.getAttribute('data-delcheck'));
@@ -3788,6 +3964,631 @@ function closeMainView(){
   applyShell();
 }
 
+
+// =====================================================================
+// HOME (página inicial)
+// Mural de comunicados, favoritos, acessos recentes, pendências e novidades.
+// - Favoritos, recentes, pendências e novidades usam dados que o painel já tem
+//   (abas/links, cadastro da pessoa e demandas).
+// - Só o mural usa coleção própria: "announcements" (comunicados) e "config/home"
+//   (grupos que podem publicar, além dos administradores). Veja as regras em
+//   firebase/firestore.rules.completo — publique-as no Firebase antes de usar o mural.
+// =====================================================================
+const megaSvg = ic('<path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1z"></path><path d="M15.5 8.5a5 5 0 0 1 0 7"></path><path d="M18.5 5.5a9 9 0 0 1 0 13"></path>');
+const ANN_LEVELS = { importante: 'Importante', aviso: 'Aviso', informativo: 'Informativo' };
+
+function stopHome(){
+  if(unsubAnn){ unsubAnn(); unsubAnn = null; }
+  if(unsubHomeCfg){ unsubHomeCfg(); unsubHomeCfg = null; }
+  homeAnnouncements = []; homeCfg = { publishGroups: [] }; homeBlocked = false; myRecents = []; homeSearchQ = '';
+}
+
+function homeListenError(err){
+  console.error('Erro ao carregar o mural', err);
+  if(err && err.code === 'permission-denied'){ homeBlocked = true; scheduleHome(); }
+}
+
+function listenHome(){
+  stopHome();
+  unsubHomeCfg = db.collection('config').doc('home').onSnapshot(doc => {
+    const d = doc.data() || {};
+    homeCfg = { publishGroups: Array.isArray(d.publishGroups) ? d.publishGroups : [] };
+    scheduleHome();
+  }, homeListenError);
+  unsubAnn = db.collection('announcements').orderBy('createdAt', 'desc').limit(40).onSnapshot(snap => {
+    homeBlocked = false;
+    homeAnnouncements = snap.docs.map(d => {
+      const x = d.data({ serverTimestamps: 'estimate' });
+      return {
+        id: d.id, title: x.title || '', body: x.body || '', level: ANN_LEVELS[x.level] ? x.level : 'informativo',
+        pinned: x.pinned === true, requireRead: x.requireRead === true,
+        author: x.author || x.createdByName || '', createdBy: x.createdBy || '',
+        createdAtMs: tsMs(x.createdAt), readBy: x.readBy && typeof x.readBy === 'object' ? x.readBy : {}
+      };
+    });
+    scheduleHome();
+    if(byId('annListBody')) fillAnnList();
+  }, homeListenError);
+}
+
+// quem publica/edita/exclui comunicados: administradores e os grupos liberados em "config/home"
+// (mesma regra das regras do Firestore — se mudar aqui, mudar lá)
+function homeCanPublish(){ return isAdmin || myGroups.some(g => (homeCfg.publishGroups || []).includes(g)); }
+
+function annSorted(){
+  return [...homeAnnouncements].sort((a, b) => ((b.pinned ? 1 : 0) - (a.pinned ? 1 : 0)) || (b.createdAtMs - a.createdAtMs));
+}
+function annPending(){ return homeAnnouncements.filter(a => a.requireRead && !a.readBy[myUid]); }
+function annStats(a){
+  const active = allUsers.filter(u => !u.blocked);
+  if(!active.length) return { n: Object.keys(a.readBy).length, total: 0 };
+  return { n: active.filter(u => a.readBy[u.uid]).length, total: active.length };
+}
+function shortDate(ms){ return ms ? new Date(ms).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : ''; }
+function relTime(ms){
+  if(!ms) return '';
+  const min = Math.floor((Date.now() - ms) / 60000);
+  if(min < 1) return 'agora';
+  if(min < 60) return 'há ' + min + ' min';
+  const h = Math.floor(min / 60);
+  if(h < 24) return 'há ' + h + ' h';
+  const lab = dayLabel(new Date(ms));
+  if(lab === 'Ontem') return 'ontem';
+  const dias = Math.floor(h / 24);
+  return dias < 7 ? 'há ' + dias + ' dias' : new Date(ms).toLocaleDateString('pt-BR');
+}
+function homeNorm(s){ return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); }
+function homeFirstName(){
+  const n = (myChatName || '').trim();
+  if(n) return n.split(/\s+/)[0];
+  const e = (auth.currentUser && auth.currentUser.email) || '';
+  const loc = e.split('@')[0].split(/[._-]/)[0] || '';
+  return loc ? loc.charAt(0).toUpperCase() + loc.slice(1) : '';
+}
+function homeGreeting(){ const h = new Date().getHours(); return (h >= 5 && h < 12) ? 'Bom dia' : (h >= 12 && h < 18) ? 'Boa tarde' : 'Boa noite'; }
+
+// ---------- acessos recentes ----------
+function trackOpen(key){
+  if(!myUid || !key) return;
+  const now = Date.now();
+  if(myRecents[0] && myRecents[0].k === key && now - myRecents[0].t < 20000) return;
+  myRecents = [{ k: key, t: now }, ...myRecents.filter(r => r.k !== key)].slice(0, 12);
+  db.collection('users').doc(myUid).set({ recentOpens: myRecents }, { merge: true }).catch(() => {});
+  scheduleHome();
+}
+function findLinkByKey(key){
+  const i = String(key).indexOf('_'); if(i < 0) return null;
+  const cat = getVisibleCategories().find(c => c.id === key.slice(0, i)); if(!cat) return null;
+  const link = cat.links.find(l => l.id === key.slice(i + 1)); if(!link) return null;
+  return { cat, link };
+}
+document.addEventListener('click', e => {
+  const el = e.target.closest && e.target.closest('[data-track]');
+  if(!el) return;
+  const btn = e.target.closest('button');
+  if(btn && btn !== el) return;   // estrela/copiar dentro do cartão não contam como abrir
+  trackOpen(el.getAttribute('data-track'));
+}, true);
+
+// ---------- desenho ----------
+function scheduleHome(){
+  updateHomeBadge();
+  if(section !== 'home') return;
+  clearTimeout(homeTimer);
+  homeTimer = setTimeout(fillHome, 60);
+}
+function updateHomeBadge(){
+  const b = byId('homeBadge'); if(!b) return;
+  const n = myUid ? annPending().length : 0;
+  b.textContent = n > 99 ? '99+' : String(n);
+  b.style.display = n ? '' : 'none';
+}
+setInterval(() => { if(section === 'home' && document.visibilityState === 'visible') fillHome(); }, 60000);
+
+function renderHome(force){
+  if(section !== 'home') return;
+  const main = byId('mainPane'); if(!main) return;
+  if(force || mainKey !== 'home' || !byId('homeScroll')) buildHomeShell(main);
+  fillHome();
+}
+
+function buildHomeShell(main){
+  mainKey = 'home';
+  main.innerHTML = `
+    <div class="home-pane" id="homeScroll"><div class="home">
+      <div class="home-top">
+        <div><div class="home-date" id="homeDate"></div><h1 class="home-hello" id="homeHello"></h1></div>
+        <div class="home-search" id="homeSearchWrap">
+          <label class="search-box">${searchIconSvg}<input id="homeSearch" type="search" placeholder="Buscar planilha, POP ou setor…" autocomplete="off" enterkeyhint="search" /></label>
+          <div class="home-results hidden" id="homeResults"></div>
+        </div>
+      </div>
+      <section class="home-mural" id="homeMural"></section>
+      <section id="homeFavs"></section>
+      <div class="home-grid">
+        <section class="h-card" id="homeRecent"></section>
+        <aside class="home-side">
+          <section class="h-card" id="homePend"></section>
+          <section class="h-card" id="homeNews"></section>
+        </aside>
+      </div>
+    </div></div>`;
+  const inp = byId('homeSearch');
+  inp.value = homeSearchQ;
+  inp.oninput = () => { homeSearchQ = inp.value; renderHomeResults(); };
+  inp.onfocus = () => renderHomeResults();
+  inp.onkeydown = e => {
+    if(e.key === 'Escape'){ inp.value = ''; homeSearchQ = ''; renderHomeResults(); inp.blur(); }
+    else if(e.key === 'Enter'){ const first = byId('homeResults').querySelector('[data-hr]'); if(first){ e.preventDefault(); first.click(); } }
+  };
+  byId('homeResults').addEventListener('click', e => {
+    const cat = e.target.closest('[data-home-cat]');
+    if(cat) openCategoryFromHome(cat.getAttribute('data-home-cat'));
+    if(e.target.closest('[data-hr]')){ inp.value = ''; homeSearchQ = ''; renderHomeResults(); }
+  });
+  byId('homeMural').addEventListener('click', onHomeMuralClick);
+  byId('homeFavs').addEventListener('click', e => {
+    const un = e.target.closest('[data-home-unfav]');
+    if(un){ e.preventDefault(); e.stopPropagation(); const k = un.getAttribute('data-home-unfav'), i = k.indexOf('_'); toggleFavorite(k.slice(0, i), k.slice(i + 1)); return; }
+    if(e.target.closest('[data-home-go="favs"]')){ goSection('sheets'); openCategory(FAV_ID); }
+  });
+  byId('homePend').addEventListener('click', e => {
+    const done = e.target.closest('[data-pend-done]');
+    if(done){
+      e.stopPropagation();
+      const d = myDemands.find(x => x.id === done.getAttribute('data-pend-done'));
+      if(d && confirm('Marcar como concluída?\n\n' + d.title)) updateDemandStatus(d.id, 'concluida');
+      return;
+    }
+    const open = e.target.closest('[data-pend-open]');
+    if(open){ const id = open.getAttribute('data-pend-open'); goSection('demands'); openDemand(id); return; }
+    if(e.target.closest('[data-home-go="demands"]')) goSection('demands');
+  });
+  byId('homeNews').addEventListener('click', e => {
+    const cat = e.target.closest('[data-home-cat]');
+    if(cat) openCategoryFromHome(cat.getAttribute('data-home-cat'));
+  });
+}
+document.addEventListener('click', e => {
+  const w = byId('homeSearchWrap');
+  if(w && !w.contains(e.target)){ const r = byId('homeResults'); if(r) r.classList.add('hidden'); }
+});
+
+function setPart(id, html){
+  const el = byId(id); if(!el || el._h === html) return;
+  el._h = html; el.innerHTML = html;
+}
+function fillHome(){
+  if(section !== 'home' || !byId('homeScroll')) return;
+  const date = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+  const d1 = byId('homeDate'); if(d1) d1.textContent = date.charAt(0).toUpperCase() + date.slice(1);
+  const nm = homeFirstName();
+  const d2 = byId('homeHello'); if(d2) d2.textContent = homeGreeting() + (nm ? ', ' + nm : '');
+  [['homeMural', homeMuralHtml], ['homeFavs', homeFavsHtml], ['homeRecent', homeRecentHtml], ['homePend', homePendHtml], ['homeNews', homeNewsHtml]]
+    .forEach(([id, fn]) => { try{ setPart(id, fn()); }catch(e){ console.error('Home: erro em ' + id, e); } });
+  renderHomeResults();
+  updateHomeBadge();
+}
+
+function fileIcoHtml(url){ const t = linkType(url); return `<span class="file-ico" style="--fi:${t.color}">${t.icon}</span>`; }
+
+// ---------- mural ----------
+function annMenuItems(a){
+  return [
+    { label: 'Editar', icon: editSvg, action: () => showAnnouncementModal(a) },
+    { label: a.pinned ? 'Desafixar do topo' : 'Fixar no topo', icon: big(pinOutlineSvg), action: () => updateAnnouncement(a.id, { pinned: !a.pinned }) },
+    a.requireRead ? { label: 'Ver quem confirmou', icon: checkCircleSvg, action: () => showAnnReadersModal(a.id) } : null,
+    { label: 'Excluir', icon: trashSvg, danger: true, action: () => deleteAnnouncement(a) }
+  ];
+}
+function annConfirmHtml(a){
+  if(!a.requireRead) return '';
+  if(a.readBy[myUid]) return `<span class="read-ok">${checkCircleSvg} Leitura confirmada</span>`;
+  return `<button class="btn primary" data-ann-read="${escapeAttr(a.id)}">Confirmar leitura</button>`;
+}
+function annByHtml(a, canSeeWho){
+  let s = 'Publicado por ' + escapeHtml(a.author || '—');
+  if(a.requireRead){
+    const st = annStats(a);
+    const txt = st.total ? `${st.n} de ${st.total} confirmaram leitura` : `${st.n} confirmaram leitura`;
+    s += ' · ' + (canSeeWho ? `<button class="text-link" data-ann-readers="${escapeAttr(a.id)}">${txt}</button>` : txt);
+  }
+  return s;
+}
+function annHeroHtml(a, can){
+  const long = a.body.length > 380 || a.body.split('\n').length > 7;
+  return `<article class="mural-hero">
+    <div class="mural-tags">
+      <span class="mural-tag ${a.level}">${ANN_LEVELS[a.level]}</span>
+      <span class="mural-pin">${a.pinned ? pinFilledSvg + ' Fixado · ' : ''}${shortDate(a.createdAtMs)}</span>
+      ${can ? `<button class="card-btn" data-ann-menu="${escapeAttr(a.id)}" title="Opções do comunicado" aria-label="Opções do comunicado">${moreSvg}</button>` : ''}
+    </div>
+    <h3 class="mural-title">${escapeHtml(a.title)}</h3>
+    <div class="mural-body${long ? ' clamp' : ''}">${linkify(escapeHtml(a.body))}</div>
+    ${long ? `<div><button class="text-link" data-ann-open="${escapeAttr(a.id)}">Ler tudo</button></div>` : ''}
+    <div class="mural-foot"><span class="mural-by">${annByHtml(a, can)}</span>${annConfirmHtml(a)}</div>
+  </article>`;
+}
+function annMiniHtml(a){
+  const sum = a.body.replace(/\s+/g, ' ').trim();
+  return `<button class="mural-mini" data-ann-open="${escapeAttr(a.id)}">
+    <span class="mini-date">${shortDate(a.createdAtMs)}${a.pinned ? ' · fixado' : ''}</span>
+    <span class="mini-title">${escapeHtml(a.title)}</span>
+    <span class="mini-sum">${escapeHtml(sum)}</span>
+    ${a.requireRead && !a.readBy[myUid] ? '<span class="mini-flag">Confirmar leitura</span>' : ''}
+  </button>`;
+}
+function homeMuralHtml(){
+  const list = annSorted();
+  const can = homeCanPublish();
+  const pend = annPending().length;
+  let body;
+  if(homeBlocked){
+    body = `<div class="mural-empty">${isAdmin
+      ? '<b>O mural ainda não está liberado no Firebase.</b><br>Publique o arquivo <b>firebase/firestore.rules.completo</b> em Firebase → Firestore Database → Regras e recarregue esta página.'
+      : 'O mural de comunicados não está disponível agora. Avise o administrador.'}</div>`;
+  } else if(!list.length){
+    body = `<div class="mural-empty">${can
+      ? '<b>Nenhum comunicado publicado ainda.</b><br>Use <b>Novo comunicado</b> para avisar a equipe.'
+      : 'Nenhum comunicado no momento. Quando a diretoria publicar um aviso, ele aparece aqui.'}
+      ${isAdmin && !(homeCfg.publishGroups || []).length ? '<br><button class="text-link" data-home-act="groups">Escolher grupos (ex.: Diretoria) que também podem publicar</button>' : ''}</div>`;
+  } else {
+    body = `<div class="mural-grid">${annHeroHtml(list[0], can)}${list.length > 1 ? `<div class="mural-side">${list.slice(1, 3).map(annMiniHtml).join('')}</div>` : ''}</div>`;
+  }
+  return `<div class="mural-head">
+      <div class="mural-ico">${megaSvg}</div>
+      <div class="mural-titles"><h2>Mural da Diretoria</h2><p>${pend ? `<b style="color:var(--danger)">${pend} comunicado${pend > 1 ? 's' : ''} aguardando sua confirmação de leitura</b>` : 'Comunicados oficiais para toda a equipe'}</p></div>
+      <div class="mural-actions">
+        ${isAdmin ? `<button class="card-btn" data-home-act="groups" title="Quem pode publicar" aria-label="Quem pode publicar">${usersSvg}</button>` : ''}
+        ${list.length ? '<button class="btn sm" data-home-act="all">Ver todos</button>' : ''}
+        ${can ? '<button class="btn primary sm" data-home-act="new">Novo comunicado</button>' : ''}
+      </div>
+    </div>${body}`;
+}
+function onHomeMuralClick(e){
+  const read = e.target.closest('[data-ann-read]');
+  if(read){ confirmAnnouncementRead(read.getAttribute('data-ann-read')); return; }
+  const readers = e.target.closest('[data-ann-readers]');
+  if(readers){ showAnnReadersModal(readers.getAttribute('data-ann-readers')); return; }
+  const menu = e.target.closest('[data-ann-menu]');
+  if(menu){
+    const a = homeAnnouncements.find(x => x.id === menu.getAttribute('data-ann-menu'));
+    if(a && homeCanPublish()) openMenu(menu, annMenuItems(a));
+    return;
+  }
+  const open = e.target.closest('[data-ann-open]');
+  if(open){ showAnnouncementsModal(open.getAttribute('data-ann-open')); return; }
+  const act = e.target.closest('[data-home-act]');
+  if(!act) return;
+  const k = act.getAttribute('data-home-act');
+  if(k === 'new') showAnnouncementModal(null);
+  else if(k === 'all') showAnnouncementsModal(null);
+  else if(k === 'groups') showHomePublishersModal();
+}
+
+// ---------- ações do mural (as regras do Firestore também checam a permissão) ----------
+function confirmAnnouncementRead(id){
+  db.collection('announcements').doc(id).update({ ['readBy.' + myUid]: firebase.firestore.FieldValue.serverTimestamp() })
+    .then(() => showSnack('Leitura confirmada'))
+    .catch(err => alert('Não foi possível confirmar a leitura: ' + errMsg(err)));
+}
+function updateAnnouncement(id, patch){
+  db.collection('announcements').doc(id).update({ ...patch, updatedAt: firebase.firestore.FieldValue.serverTimestamp() })
+    .catch(err => alert('Erro ao atualizar o comunicado: ' + errMsg(err)));
+}
+function deleteAnnouncement(a){
+  if(!confirm('Excluir o comunicado "' + a.title + '"?\nEle some do mural para todos.')) return;
+  db.collection('announcements').doc(a.id).delete()
+    .then(() => { logActivity('excluiu o comunicado', a.title); showSnack('Comunicado excluído'); })
+    .catch(err => alert('Erro ao excluir o comunicado: ' + errMsg(err)));
+}
+
+function showAnnouncementModal(a){
+  if(!homeCanPublish()) return;
+  const root = byId('modalRoot'), editing = !!a;
+  const me = displayNameFor({ chatName: myChatName, email: auth.currentUser.email });
+  root.innerHTML = `
+    <div class="modal-bg" id="modalBg"><div class="modal" style="max-width:520px;">
+      <h3>${editing ? 'Editar comunicado' : 'Novo comunicado'}</h3>
+      <label class="f-label" for="annTitle">Título</label>
+      <input id="annTitle" type="text" maxlength="120" placeholder="Ex.: Novos POPs de expedição valem a partir de segunda" value="${escapeAttr(a ? a.title : '')}" />
+      <label class="f-label" for="annBody">Texto</label>
+      <textarea id="annBody" class="f-input" rows="6" maxlength="3000" placeholder="Escreva o aviso para a equipe…"></textarea>
+      <div class="field-row">
+        <div class="field"><label class="f-label" for="annLevel">Destaque</label>
+          <select id="annLevel" class="select" style="width:100%;margin-bottom:12px;">${Object.keys(ANN_LEVELS).map(k => `<option value="${k}"${a && a.level === k ? ' selected' : ''}>${ANN_LEVELS[k]}</option>`).join('')}</select></div>
+        <div class="field"><label class="f-label" for="annAuthor">Publicado por</label>
+          <input id="annAuthor" type="text" maxlength="40" value="${escapeAttr(a ? (a.author || '') : me)}" /></div>
+      </div>
+      <label class="checklist-row"><input type="checkbox" id="annPinned"${a && a.pinned ? ' checked' : ''} /><span>Fixar no topo do mural</span></label>
+      <label class="checklist-row"><input type="checkbox" id="annReq"${a ? (a.requireRead ? ' checked' : '') : ' checked'} /><span>Pedir confirmação de leitura</span></label>
+      ${editing && a.requireRead ? '<label class="checklist-row"><input type="checkbox" id="annReset" /><span>Reiniciar confirmações (todos precisam ler de novo)</span></label>' : ''}
+      <div class="actions"><button class="cancel" id="annCancel">Cancelar</button><button class="confirm" id="annSave">${editing ? 'Salvar' : 'Publicar'}</button></div>
+    </div></div>`;
+  byId('annBody').value = a ? a.body : '';
+  byId('annTitle').focus();
+  byId('annCancel').onclick = () => { root.innerHTML = ''; };
+  byId('modalBg').onclick = e => { if(e.target.id === 'modalBg') root.innerHTML = ''; };
+  byId('annSave').onclick = () => {
+    const title = byId('annTitle').value.trim(), body = byId('annBody').value.trim();
+    if(!title){ byId('annTitle').focus(); return; }
+    if(!body){ byId('annBody').focus(); return; }
+    const data = {
+      title, body, level: byId('annLevel').value, author: byId('annAuthor').value.trim() || me,
+      pinned: byId('annPinned').checked, requireRead: byId('annReq').checked,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    const btn = byId('annSave'); btn.disabled = true;
+    let p;
+    if(editing){
+      if(byId('annReset') && byId('annReset').checked) data.readBy = {};
+      p = db.collection('announcements').doc(a.id).update(data);
+    } else {
+      p = db.collection('announcements').add({ ...data, createdBy: myUid, createdByName: me, createdAt: firebase.firestore.FieldValue.serverTimestamp(), readBy: {} });
+    }
+    p.then(() => { logActivity(editing ? 'editou o comunicado' : 'publicou o comunicado', title); root.innerHTML = ''; showSnack(editing ? 'Comunicado salvo' : 'Comunicado publicado'); })
+     .catch(err => { btn.disabled = false; alert('Não foi possível salvar o comunicado: ' + errMsg(err)); });
+  };
+}
+
+function annFullHtml(a, focusId){
+  const can = homeCanPublish();
+  return `<article class="ann-full${a.id === focusId ? ' focus' : ''}" id="ann-${escapeAttr(a.id)}">
+    <div class="mural-tags"><span class="mural-tag ${a.level}">${ANN_LEVELS[a.level]}</span>
+      <span class="mural-pin">${a.pinned ? pinFilledSvg + ' Fixado · ' : ''}${shortDate(a.createdAtMs)}</span></div>
+    <h3 class="mural-title">${escapeHtml(a.title)}</h3>
+    <div class="mural-body">${linkify(escapeHtml(a.body))}</div>
+    <div class="mural-foot" style="margin-top:10px;"><span class="mural-by">${annByHtml(a, false)}</span>${annConfirmHtml(a)}</div>
+    ${can ? `<div class="ann-tools">
+      <button class="text-link" data-am="edit" data-id="${escapeAttr(a.id)}">Editar</button>
+      <button class="text-link" data-am="pin" data-id="${escapeAttr(a.id)}">${a.pinned ? 'Desafixar' : 'Fixar no topo'}</button>
+      ${a.requireRead ? `<button class="text-link" data-am="who" data-id="${escapeAttr(a.id)}">Quem confirmou</button>` : ''}
+      <button class="text-link" data-am="del" data-id="${escapeAttr(a.id)}" style="color:var(--danger);">Excluir</button></div>` : ''}
+  </article>`;
+}
+let annFocusId = null;
+function fillAnnList(){
+  const box = byId('annListBody'); if(!box) return;
+  const list = annSorted();
+  const html = list.length ? list.map(a => annFullHtml(a, annFocusId)).join('') : '<div class="h-empty">Nenhum comunicado publicado.</div>';
+  if(box._h === html) return;
+  box._h = html; box.innerHTML = html;
+}
+function showAnnouncementsModal(focusId){
+  annFocusId = focusId || null;
+  const root = byId('modalRoot');
+  root.innerHTML = `
+    <div class="modal-bg" id="modalBg"><div class="modal" style="max-width:640px;">
+      <h3>Mural da Diretoria</h3>
+      <div id="annListBody"></div>
+      <div class="actions"><button class="cancel" id="annClose">Fechar</button></div>
+    </div></div>`;
+  fillAnnList();
+  byId('annClose').onclick = () => { root.innerHTML = ''; annFocusId = null; };
+  byId('modalBg').onclick = e => { if(e.target.id === 'modalBg'){ root.innerHTML = ''; annFocusId = null; } };
+  byId('annListBody').addEventListener('click', e => {
+    const read = e.target.closest('[data-ann-read]');
+    if(read){ confirmAnnouncementRead(read.getAttribute('data-ann-read')); return; }
+    const am = e.target.closest('[data-am]'); if(!am) return;
+    const a = homeAnnouncements.find(x => x.id === am.getAttribute('data-id')); if(!a) return;
+    const k = am.getAttribute('data-am');
+    if(k === 'edit') showAnnouncementModal(a);
+    else if(k === 'pin') updateAnnouncement(a.id, { pinned: !a.pinned });
+    else if(k === 'who') showAnnReadersModal(a.id);
+    else if(k === 'del') deleteAnnouncement(a);
+  });
+  if(focusId){ const el = byId('ann-' + focusId); if(el) el.scrollIntoView({ block: 'center' }); }
+}
+
+function showAnnReadersModal(id){
+  const a = homeAnnouncements.find(x => x.id === id); if(!a) return;
+  const root = byId('modalRoot');
+  const people = allUsers.filter(u => !u.blocked)
+    .map(u => ({ name: displayNameFor(u), at: a.readBy[u.uid] ? tsMs(a.readBy[u.uid]) || 1 : 0 }))
+    .sort((x, y) => (x.at ? 1 : 0) - (y.at ? 1 : 0) || x.name.localeCompare(y.name, 'pt-BR'));
+  const st = annStats(a);
+  root.innerHTML = `
+    <div class="modal-bg" id="modalBg"><div class="modal" style="max-width:440px;">
+      <h3>Confirmações de leitura</h3>
+      <div class="mural-by" style="margin-bottom:10px;"><b>${escapeHtml(a.title)}</b><br>${st.total ? `${st.n} de ${st.total} confirmaram` : `${st.n} confirmaram`}</div>
+      <div>${people.map(p => `<div class="reader-row"><span class="grow">${escapeHtml(p.name)}</span>${p.at ? `<span class="ok">Leu${p.at > 1 ? ' · ' + shortDate(p.at) : ''}</span>` : '<span class="wait">Pendente</span>'}</div>`).join('') || '<div class="h-empty">Sem lista de pessoas.</div>'}</div>
+      <div class="actions"><button class="cancel" id="rdClose">Fechar</button></div>
+    </div></div>`;
+  byId('rdClose').onclick = () => { root.innerHTML = ''; };
+  byId('modalBg').onclick = e => { if(e.target.id === 'modalBg') root.innerHTML = ''; };
+}
+
+// grupos que também podem publicar no mural (só o administrador define)
+function showHomePublishersModal(){
+  if(!isAdmin) return;
+  const root = byId('modalRoot');
+  const sel = new Set(homeCfg.publishGroups || []);
+  root.innerHTML = `
+    <div class="modal-bg" id="modalBg"><div class="modal" style="max-width:440px;">
+      <h3>Quem pode publicar no mural</h3>
+      <div class="mural-by" style="margin-bottom:10px;">Administradores sempre podem. Marque os grupos (ex.: Diretoria) cujos membros também podem publicar, editar e excluir comunicados. Os demais só leem e confirmam a leitura.</div>
+      <div id="pubGroups">${allGroups.length
+        ? allGroups.map(g => `<label class="checklist-row"><input type="checkbox" value="${escapeAttr(g.id)}"${sel.has(g.id) ? ' checked' : ''} /><span>${escapeHtml(g.name)}</span></label>`).join('')
+        : '<div class="h-empty">Nenhum grupo criado ainda. Crie o grupo Diretoria em Admin → Grupos de acesso e volte aqui.</div>'}</div>
+      <div class="actions"><button class="cancel" id="pgCancel">Cancelar</button><button class="confirm" id="pgSave"${allGroups.length ? '' : ' disabled'}>Salvar</button></div>
+    </div></div>`;
+  byId('pgCancel').onclick = () => { root.innerHTML = ''; };
+  byId('modalBg').onclick = e => { if(e.target.id === 'modalBg') root.innerHTML = ''; };
+  byId('pgSave').onclick = () => {
+    const ids = [...byId('pubGroups').querySelectorAll('input:checked')].map(i => i.value);
+    db.collection('config').doc('home').set({ publishGroups: ids, updatedBy: myUid, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true })
+      .then(() => { logActivity('definiu quem publica no mural', ids.map(id => (allGroups.find(g => g.id === id) || {}).name || id).join(', ') || 'só administradores'); root.innerHTML = ''; showSnack('Permissões do mural salvas'); })
+      .catch(err => alert('Erro ao salvar: ' + errMsg(err)));
+  };
+}
+
+// ---------- favoritos ----------
+function homeFavsHtml(){
+  const favs = getFavoriteEntries();
+  const shown = favs.slice(0, 8);
+  return `<div class="h-head"><h2 class="h-title">Favoritos</h2>${favs.length ? '<button class="text-link" data-home-go="favs">Gerenciar</button>' : ''}</div>
+    ${shown.length ? `<div class="fav-grid">${shown.map(({ cat, link }) => {
+      const key = cat.id + '_' + link.id, t = linkType(link.url);
+      return `<a class="fav-card" href="${escapeAttr(link.url)}" target="_blank" rel="noopener noreferrer" data-track="${escapeAttr(key)}">
+        <div class="fav-top">${fileIcoHtml(link.url)}<button class="card-btn fav-on" data-home-unfav="${escapeAttr(key)}" title="Remover dos favoritos" aria-label="Remover dos favoritos">${starFilledSvg}</button></div>
+        <div class="fav-name">${escapeHtml(link.title)}</div>
+        <div class="fav-sub">${escapeHtml(t.label)} · ${escapeHtml(cat.name)}</div></a>`;
+    }).join('')}</div>`
+    : '<div class="h-card"><div class="h-empty">Você ainda não tem favoritos. Toque na estrela de uma planilha, POP ou ferramenta e ela fica aqui, a um clique.</div></div>'}`;
+}
+
+// ---------- acessos recentes ----------
+function homeRecentHtml(){
+  const rows = myRecents.map(r => ({ r, f: findLinkByKey(r.k) })).filter(x => x.f).slice(0, 6);
+  return `<div class="h-head"><h2 class="h-title">Abertas recentemente</h2></div>
+    ${rows.length ? rows.map(({ r, f }) => `<a class="h-row" href="${escapeAttr(f.link.url)}" target="_blank" rel="noopener noreferrer" data-track="${escapeAttr(r.k)}">
+      ${fileIcoHtml(f.link.url)}<span class="h-row-main"><span class="h-row-title">${escapeHtml(f.link.title)}</span><span class="h-row-sub">${escapeHtml(f.cat.name)}</span></span>
+      <span class="h-row-time">${escapeHtml(relTime(r.t))}</span></a>`).join('')
+    : '<div class="h-empty">As planilhas, POPs e documentos que você abrir aparecem aqui.</div>'}`;
+}
+
+// ---------- pendências (vêm das Demandas atribuídas a esta pessoa) ----------
+function homePendingList(){
+  return myDemands.filter(d => isMyAssignee(d) && (d.status === 'aberta' || d.status === 'em_andamento') && !(d.archived && d.archived[myUid]))
+    .sort((a, b) => (a.deadline || '9999-99-99').localeCompare(b.deadline || '9999-99-99'));
+}
+function demandSetor(d){
+  const s = new Set();
+  (d.assignedTo || []).forEach(u => { if(appSetorUsers && appSetorUsers[u]) s.add(appSetorUsers[u]); });
+  return [...s].join(', ');
+}
+function pendDueHtml(d){
+  if(!d.deadline) return '<span class="due">Sem prazo</span>';
+  const today = hojeLocalISO();
+  if(d.deadline < today) return `<span class="due late">Atrasada · ${escapeHtml(formatDeadline(d.deadline))}</span>`;
+  if(d.deadline === today) return '<span class="due today">Vence hoje</span>';
+  const diff = Math.round((new Date(d.deadline + 'T00:00:00') - new Date(today + 'T00:00:00')) / 86400000);
+  if(diff === 1) return '<span class="due soon">Vence amanhã</span>';
+  return `<span class="due">Até ${escapeHtml(formatDeadline(d.deadline).slice(0, 5))}</span>`;
+}
+function homePendHtml(){
+  const list = homePendingList();
+  const late = list.filter(isDemandOverdue).length;
+  return `<div class="h-head"><h2 class="h-title">Suas pendências</h2>${list.length ? `<span class="h-count${late ? ' hot' : ''}">${list.length} aberta${list.length > 1 ? 's' : ''}</span>` : ''}</div>
+    ${list.length ? list.slice(0, 5).map(d => {
+      const setor = demandSetor(d), ck = d.checklist || [];
+      return `<div class="pend" data-pend-open="${escapeAttr(d.id)}">
+        <button class="pend-check" data-pend-done="${escapeAttr(d.id)}" title="Marcar como concluída" aria-label="Marcar como concluída"></button>
+        <div class="pend-main"><div class="pend-title">${escapeHtml(d.title)}</div>
+          <div class="pend-meta">${pendDueHtml(d)}${setor ? ' · ' + escapeHtml(setor) : ''}${ck.length ? ` · ${ck.filter(c => c.done).length}/${ck.length}` : ''}</div></div></div>`;
+    }).join('') : '<div class="h-empty">Nenhuma pendência com você. Tudo em dia!</div>'}
+    <div class="h-foot"><button class="text-link" data-home-go="demands">Ver todas as tarefas</button></div>`;
+}
+
+// ---------- novidades do sistema (calculadas das abas e links; sem coleção nova) ----------
+function homeNewsItems(){
+  const since = Date.now() - 30 * 86400000, out = [];
+  getVisibleCategories().forEach(cat => {
+    if(cat.createdAtMillis > since) out.push({ at: cat.createdAtMillis, kind: 'cat', title: cat.name, sub: 'Aba criada', catId: cat.id });
+    cat.links.forEach(l => {
+      if(l.createdAtMillis > since) out.push({ at: l.createdAtMillis, kind: 'new', title: l.title, sub: 'Novo em ' + cat.name, link: l, key: cat.id + '_' + l.id });
+      if(l.updatedAtMillis > since && l.updatedAtMillis - l.createdAtMillis > 120000) out.push({ at: l.updatedAtMillis, kind: 'upd', title: l.title, sub: 'Atualizado em ' + cat.name, link: l, key: cat.id + '_' + l.id });
+    });
+  });
+  return out.sort((a, b) => b.at - a.at).slice(0, 6);
+}
+function homeNewsHtml(){
+  const items = homeNewsItems();
+  return `<div class="h-head"><h2 class="h-title">Novidades do sistema</h2></div>
+    ${items.length ? items.map(n => {
+      const inner = `<span class="news-dot ${n.kind === 'new' ? 'new' : n.kind === 'cat' ? 'cat' : ''}"></span><span class="news-main"><div class="news-title">${escapeHtml(n.title)}</div><div class="news-sub">${escapeHtml(n.sub)} · ${shortDate(n.at)}</div></span>`;
+      return n.link
+        ? `<a class="news" href="${escapeAttr(n.link.url)}" target="_blank" rel="noopener noreferrer" data-track="${escapeAttr(n.key)}">${inner}</a>`
+        : `<button class="news" data-home-cat="${escapeAttr(n.catId)}">${inner}</button>`;
+    }).join('') : '<div class="h-empty">Sem novidades nos últimos 30 dias.</div>'}`;
+}
+
+// ---------- busca rápida (planilhas, POPs, documentos e setores = abas) ----------
+function openCategoryFromHome(catId){ goSection('sheets'); openCategory(catId); }
+function renderHomeResults(){
+  const box = byId('homeResults'); if(!box) return;
+  const toks = homeNorm(homeSearchQ).split(/\s+/).filter(Boolean);
+  if(!toks.length){ box.classList.add('hidden'); box.innerHTML = ''; return; }
+  const cats = getVisibleCategories();
+  const links = [];
+  cats.forEach(cat => cat.links.forEach(l => {
+    const hay = homeNorm(l.title + ' ' + cat.name + ' ' + linkType(l.url).label);
+    if(toks.every(t => hay.includes(t))) links.push({ cat, l });
+  }));
+  const setores = cats.filter(c => toks.every(t => homeNorm(c.name).includes(t)));
+  let html = '';
+  if(links.length) html += '<div class="h-sec">Planilhas, POPs e documentos</div>' + links.slice(0, 8).map(({ cat, l }) =>
+    `<a class="h-row" data-hr href="${escapeAttr(l.url)}" target="_blank" rel="noopener noreferrer" data-track="${escapeAttr(cat.id + '_' + l.id)}">${fileIcoHtml(l.url)}<span class="h-row-main"><span class="h-row-title">${escapeHtml(l.title)}</span><span class="h-row-sub">${escapeHtml(linkType(l.url).label)} · ${escapeHtml(cat.name)}</span></span></a>`).join('');
+  if(setores.length) html += '<div class="h-sec">Setores (abas)</div>' + setores.slice(0, 4).map(c =>
+    `<button class="h-row" data-hr data-home-cat="${escapeAttr(c.id)}"><span class="file-ico" style="--fi:var(--accent)">${folderSvg}</span><span class="h-row-main"><span class="h-row-title">${escapeHtml(c.name)}</span><span class="h-row-sub">${c.links.length} item(ns)</span></span></button>`).join('');
+  if(!html) html = `<div class="h-none">Nada encontrado para “${escapeHtml(homeSearchQ.trim())}”.</div>`;
+  box.innerHTML = html;
+  box.classList.remove('hidden');
+}
+
+// ---------- editar o texto da tarefa (demanda) e dos itens do checklist ----------
+// Quem pode: as mesmas pessoas que já podem alterar a demanda (admin, quem abriu e responsáveis) — regra do Firestore.
+function canEditDemandText(d){ return isAdmin || d.createdBy === myUid || isMyAssignee(d); }
+
+function showEditDemandModal(demandId){
+  const d = myDemands.find(x => x.id === demandId); if(!d || !canEditDemandText(d)) return;
+  const root = byId('modalRoot');
+  root.innerHTML = `
+    <div class="modal-bg" id="modalBg"><div class="modal" style="max-width:520px;">
+      <h3>Editar tarefa</h3>
+      <label class="f-label" for="edDemTitle">Título</label>
+      <input id="edDemTitle" type="text" maxlength="140" value="${escapeAttr(d.title)}" />
+      <label class="f-label" for="edDemDesc">Descrição</label>
+      <textarea id="edDemDesc" class="f-input" rows="6"></textarea>
+      <div class="actions"><button class="cancel" id="edDemCancel">Cancelar</button><button class="confirm" id="edDemSave">Salvar</button></div>
+    </div></div>`;
+  byId('edDemDesc').value = d.description || '';
+  byId('edDemTitle').focus();
+  byId('edDemCancel').onclick = () => { root.innerHTML = ''; };
+  byId('modalBg').onclick = e => { if(e.target.id === 'modalBg') root.innerHTML = ''; };
+  byId('edDemSave').onclick = () => {
+    const title = byId('edDemTitle').value.trim(), description = byId('edDemDesc').value.trim();
+    if(!title){ byId('edDemTitle').focus(); return; }
+    if(title === d.title && description === (d.description || '')){ root.innerHTML = ''; return; }
+    const btn = byId('edDemSave'); btn.disabled = true;
+    db.collection('demands').doc(demandId).update({ title, description, updatedAt: firebase.firestore.FieldValue.serverTimestamp() })
+      .then(() => { logActivity('editou o texto da tarefa', title); root.innerHTML = ''; showSnack('Tarefa atualizada'); })
+      .catch(err => { btn.disabled = false; alert('Erro ao salvar: ' + errMsg(err)); });
+  };
+}
+
+function startEditChecklistItem(demandId, itemId){
+  const d = myDemands.find(x => x.id === demandId); if(!d || !canEditDemandText(d)) return;
+  const item = (d.checklist || []).find(c => c.id === itemId); if(!item) return;
+  const root = byId('modalRoot');
+  root.innerHTML = `
+    <div class="modal-bg" id="modalBg"><div class="modal" style="max-width:440px;">
+      <h3>Editar item do checklist</h3>
+      <input id="edCkText" type="text" maxlength="200" value="${escapeAttr(item.text)}" />
+      <div class="actions"><button class="cancel" id="edCkCancel">Cancelar</button><button class="confirm" id="edCkSave">Salvar</button></div>
+    </div></div>`;
+  const inp = byId('edCkText'); inp.focus(); inp.select();
+  byId('edCkCancel').onclick = () => { root.innerHTML = ''; };
+  byId('modalBg').onclick = e => { if(e.target.id === 'modalBg') root.innerHTML = ''; };
+  const save = () => {
+    const text = inp.value.trim();
+    if(!text){ inp.focus(); return; }
+    root.innerHTML = '';
+    if(text !== item.text) updateDemandChecklistText(demandId, itemId, text);
+  };
+  byId('edCkSave').onclick = save;
+  inp.onkeydown = e => { if(e.key === 'Enter'){ e.preventDefault(); save(); } };
+}
+
+function updateDemandChecklistText(demandId, itemId, text){
+  // usa sempre a lista mais recente, para não desfazer o que outra pessoa marcou agora
+  const cur = (myDemands.find(x => x.id === demandId) || {}).checklist || [];
+  const updated = cur.map(c => c.id === itemId ? { ...c, text } : c);
+  patchDemandChecklistUI(demandId, updated);
+  db.collection('demands').doc(demandId).update({ checklist: updated, updatedAt: firebase.firestore.FieldValue.serverTimestamp() })
+    .catch(err => alert('Erro ao editar o item: ' + errMsg(err)));
+}
+
 function goSection(s){
   closeMenu(); closeEmojiPanel();
   if(s === 'admin' && !isAdmin) s = 'sheets';
@@ -3814,7 +4615,8 @@ function renderSection(){
   closeMenu();
   buildSidebar();
   mainKey = '';
-  if(section === 'sheets'){ sheetsSig = ''; renderSheets(true); }
+  if(section === 'home'){ renderHome(true); }
+  else if(section === 'sheets'){ sheetsSig = ''; renderSheets(true); }
   else if(section === 'chats'){ renderConversationList(); renderChatModal(); }
   else if(section === 'demands'){ renderDemandsList(); renderDemandModal(); }
   else if(section === 'admin'){ renderAdminList(); renderAdminMain(); }
@@ -3829,7 +4631,8 @@ function renderSection(){
 function render(){
   updateSheetsDot();
   if(!byId('sideList')) return;
-  if(section === 'sheets') renderSheets(false);
+  if(section === 'home') scheduleHome();
+  else if(section === 'sheets') renderSheets(false);
   else if(section === 'chats') refreshChatsUI();
   else if(section === 'admin') renderAdminMain();
 }
@@ -3872,7 +4675,10 @@ function buildSidebar(){
   fab.innerHTML = ''; fab.classList.add('hidden'); fab.onclick = null;
   const setFab = (icon, title, fn) => { fab.innerHTML = icon; fab.title = title; fab.setAttribute('aria-label', title); fab.classList.remove('hidden'); fab.onclick = fn; };
 
-  if(section === 'sheets'){
+  if(section === 'home'){
+    head.innerHTML = ''; tools.innerHTML = ''; const sl = byId('sideList'); if(sl) sl.innerHTML = '';
+  }
+  else if(section === 'sheets'){
     head.innerHTML = sideHeadHtml('Planilhas', isAdmin ? [{ id: 'sideAddCat', icon: folderPlusSvg, title: 'Nova aba', primary: true }] : []);
     tools.innerHTML = searchBoxHtml('searchInput', 'Buscar planilha ou aba…', searchQuery);
     byId('searchInput').oninput = e => { searchQuery = e.target.value.trim().toLowerCase(); renderSheets(true); updateInstallBanner(); };
@@ -3999,7 +4805,7 @@ function linkResultRowHtml(cat, link){
   const key = cat.id + '_' + link.id;
   const fav = myFavorites.includes(key);
   const t = linkType(link.url);
-  return `<div class="row" role="button" tabindex="0" data-open-url="${escapeAttr(link.url)}">
+  return `<div class="row" role="button" tabindex="0" data-open-url="${escapeAttr(link.url)}" data-track="${escapeAttr(key)}">
     <div class="avatar square" style="--av:${t.color}">${t.icon}</div>
     <div class="row-main">
       <div class="row-top"><span class="row-title"><span>${escapeHtml(link.title)}</span></span></div>
@@ -4083,7 +4889,7 @@ function linkCardHtml(cat, l, prevSeen, opts){
   const added = l.createdAtMillis ? new Date(l.createdAtMillis).toLocaleDateString('pt-BR') : '';
   return `<div class="link-card">
     <button class="card-btn${fav ? ' fav-on' : ''}" data-fav="${escapeAttr(key)}" title="${fav ? 'Remover dos favoritos' : 'Marcar como favorito'}" aria-label="${fav ? 'Remover dos favoritos' : 'Marcar como favorito'}">${fav ? starFilledSvg : starOutlineSvg}</button>
-    <a class="link-main" href="${escapeAttr(l.url)}" target="_blank" rel="noopener noreferrer">
+    <a class="link-main" href="${escapeAttr(l.url)}" target="_blank" rel="noopener noreferrer" data-track="${escapeAttr(key)}">
       <span class="file-ico" style="--fi:${t.color}">${t.icon}</span>
       <span class="link-text">
         <span class="link-title">${escapeHtml(l.title)}${isNew ? '<span class="new-tag">NOVO</span>' : ''}</span>
@@ -4884,6 +5690,7 @@ function renderDemandHead(d){
   byId('backToDemands').onclick = goBack;
   byId('pinDemandBtn').onclick = () => toggleDemandPin(d.id, pinned);
   byId('demandMenuBtn').onclick = e => openMenu(e.currentTarget, [
+    canEditDemandText(d) ? { label: 'Editar título e descrição', icon: editSvg, action: () => showEditDemandModal(d.id) } : null,
     canManage ? { label: 'Reatribuir', icon: usersSvg, action: () => showReassignModal(d.id) } : null,
     { label: demandHistoryOpen ? 'Ocultar histórico de status' : 'Ver histórico de status', icon: big(historySvg), action: () => toggleDemandHistory(d.id) },
     { label: archived ? 'Desarquivar' : 'Arquivar', icon: archiveSvg, action: () => {
@@ -5406,7 +6213,7 @@ function consumeDeepLink(){
     return;
   }
   pendingDeepLink = null; clearDeepLinkUrl();
-  if(['sheets', 'chats', 'demands', 'requisicao', 'admin', 'settings'].includes(dl.section) && dl.section !== section) goSection(dl.section);
+  if(['home', 'sheets', 'chats', 'demands', 'requisicao', 'admin', 'settings'].includes(dl.section) && dl.section !== section) goSection(dl.section);
 }
 
 
@@ -5634,6 +6441,7 @@ function listenRequisicao(){
     const d = doc.data() || {};
     appSetores = Array.isArray(d.lista) ? d.lista : null;
     appSetorUsers = d.porUsuario || {};
+    scheduleHome();
     reqEnsureData();
     reqRefresh();
   }, err => reportListenError('setores', err));

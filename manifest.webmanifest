@@ -19,6 +19,7 @@
     { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "shortcuts": [
+    { "name": "Início", "short_name": "Início", "url": "./?s=home", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" }] },
     { "name": "Conversas", "short_name": "Conversas", "url": "./?s=chats", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" }] },
     { "name": "Demandas", "short_name": "Demandas", "url": "./?s=demands", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" }] },
     { "name": "Planilhas", "short_name": "Planilhas", "url": "./?s=sheets", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" }] }
