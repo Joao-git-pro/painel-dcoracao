@@ -1212,10 +1212,20 @@ function moveToList(c, listId){
   const last = sortedCards(listId).slice(-1)[0];
   patchCard(c.id, { listId, order: (last ? last.order : 0) + 1024 });
 }
+// avisa no celular de quem foi escolhido como responsável (servidor de push)
+function notifyAssign(cardId, uids){
+  const list = (uids || []).filter(u => u && u !== myUid);
+  if(!list.length) return;
+  try{
+    if(typeof pushConfigured === 'function' && pushConfigured() && typeof pushCall === 'function')
+      pushCall({ action: 'cartao', boardId: view && view.id, cardId, uids: list }).catch(() => {});
+  }catch(e){}
+}
 function toggleAssignee(c, uid){
   const cur = c.assignees || [];
-  const next = cur.includes(uid) ? cur.filter(x => x !== uid) : cur.concat(uid);
-  patchCard(c.id, { assignees: next });
+  const add = !cur.includes(uid);
+  const next = add ? cur.concat(uid) : cur.filter(x => x !== uid);
+  patchCard(c.id, { assignees: next }).then(() => { if(add) notifyAssign(c.id, [uid]); });
 }
 function newId(){ return Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4); }
 function addChk(c){
@@ -1295,12 +1305,17 @@ function createModal(pre){
       <div style="width:122px"><div class="ag-lbl">Hora (opcional)</div><input class="ag-field" type="time" id="agCTime" value="${attr(tm)}"></div></div>
     <div class="ag-lbl" style="margin-top:10px">Lista</div>
     <select class="ag-select" id="agCList">${lists.map(l => `<option value="${attr(l.id)}"${def && l.id === def.id ? ' selected' : ''}>${esc(l.name)}</option>`).join('')}</select>
+    <div class="ag-lbl" style="margin-top:10px">Responsável (recebe aviso no celular)</div>
+    <div class="ag-ppl" id="agCPpl">${(b.memberUids || []).map(u => `<button type="button" class="ag-p" data-u="${attr(u)}" aria-pressed="false">${avatarHtml(userName(u), u)}${esc(u === myUid ? 'Eu' : firstName(userName(u)))}</button>`).join('')}</div>
     <div class="ag-hint" id="agCErr" style="color:var(--danger); min-height:18px; margin-top:6px"></div>
     <div class="actions"><button class="cancel" id="agCNo">Cancelar</button><button class="confirm" id="agCYes">Criar cartão</button></div></div></div>`;
   const close = () => { root.innerHTML = ''; };
   byId('agCNo').onclick = close;
   byId('agCBg').onclick = e => { if(e.target.id === 'agCBg') close(); };
   const dEl = byId('agCDate'), lEl = byId('agCList'), err = byId('agCErr');
+  const picked = new Set();
+  byId('agCPpl').onclick = e => { const bt = e.target.closest('[data-u]'); if(!bt) return; const u = bt.dataset.u;
+    if(picked.has(u)){ picked.delete(u); bt.classList.remove('on'); bt.setAttribute('aria-pressed', 'false'); } else { picked.add(u); bt.classList.add('on'); bt.setAttribute('aria-pressed', 'true'); } };
   dEl.onchange = () => { const d = dEl.value ? new Date(dEl.value + 'T00:00').getTime() : null; const l = d && dayListFor(d); if(l && isDayList(lists.find(x => x.id === lEl.value))) lEl.value = l.id; };
   const go = () => {
     const title = byId('agCTitle').value.trim().replace(/\s+/g, ' ');
@@ -1316,9 +1331,9 @@ function createModal(pre){
     const w = weekStart(date);
     const last = cards.filter(c => c.listId === list.id && cardWeek(c) === w).sort((a, z) => (a.order || 0) - (z.order || 0)).slice(-1)[0];
     bRef().collection('cards').add(Object.assign({
-      listId: list.id, title, desc: '', week: w, order: (last ? last.order : 0) + 1024, due: null, done: false, assignees: [], checklist: [],
+      listId: list.id, title, desc: '', week: w, order: (last ? last.order : 0) + 1024, due: null, done: false, assignees: Array.from(picked), checklist: [],
       createdBy: myUid, createdByName: myName(), createdAt: FV().serverTimestamp(), updatedAt: FV().serverTimestamp()
-    }, extra)).then(() => toast('Cartão criado')).catch(fail);
+    }, extra)).then(ref => { toast(picked.size ? 'Cartão criado · responsável avisado' : 'Cartão criado'); notifyAssign(ref.id, Array.from(picked)); }).catch(fail);
     close();
   };
   byId('agCYes').onclick = go;

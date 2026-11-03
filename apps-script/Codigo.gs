@@ -28,6 +28,7 @@ function doPost(e){
       case 'desregistrar': desregistrar_(uid, body.fcmToken); out = { ok: true }; break;
       case 'msg':         out = { ok: true, enviados: avisarMensagem_(uid, body.convId) }; break;
       case 'demanda':     out = { ok: true, enviados: avisarDemanda_(uid, body.demandId) }; break;
+      case 'cartao':      out = { ok: true, enviados: avisarCartao_(uid, body.boardId, body.cardId, body.uids) }; break;
       case 'requisicao':  out = { ok: true, enviados: avisarRequisicao_(uid, body.reqId, body.evento) }; break;
       default:            out = { ok: false, erro: 'ação desconhecida' };
     }
@@ -101,6 +102,32 @@ function avisarMensagem_(uid, convId){
   let n = 0;
   parts.filter(p => p !== uid).forEach(dest => {
     n += enviar_(dest, { title: nome, body: texto.length > 140 ? texto.slice(0, 137) + '…' : texto, convId: convId });
+  });
+  return n;
+}
+
+// ---------------------------------------------------------------------
+// Agendas: avisa o responsável quando um cartão é atribuído a ele
+// ---------------------------------------------------------------------
+function avisarCartao_(uid, boardId, cardId, uids){
+  if(!boardId || !cardId || !Array.isArray(uids)) return 0;
+  const b = lerDoc_('boards/' + boardId);
+  const c = lerDoc_('boards/' + boardId + '/cards/' + cardId);
+  if(!b || !c) return 0;
+  // só quem participa da agenda (ou o dono) dispara o aviso
+  if(b.ownerUid !== uid && (b.memberUids || []).indexOf(uid) === -1) return 0;
+  const nome = nomeDe_(uid);
+  let quando = '';
+  if(c.due){
+    quando = ' · ' + Utilities.formatDate(new Date(Number(c.due)), 'America/Sao_Paulo', c.allDay === false ? "dd/MM 'às' HH:mm" : 'dd/MM');
+  }
+  const titulo = String(c.title || 'Nova tarefa');
+  let n = 0;
+  uids.slice(0, 10).forEach(dest => {
+    if(dest === uid) return;
+    if((c.assignees || []).indexOf(dest) === -1) return;            // só quem realmente é responsável
+    if((b.memberUids || []).indexOf(dest) === -1 && b.ownerUid !== dest) return;
+    n += enviar_(dest, { title: 'Nova tarefa de ' + nome, body: (titulo.length > 110 ? titulo.slice(0, 107) + '…' : titulo) + quando + ' · ' + String(b.name || 'Agenda'), section: 'agendas' });
   });
   return n;
 }
