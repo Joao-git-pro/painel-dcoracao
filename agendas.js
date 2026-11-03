@@ -49,6 +49,8 @@ let sheetBackPending = false;
 let confirmDelete = false;
 let fanOpen = false;
 let first = { b: true };
+let wk = weekStart(Date.now());   // segunda-feira (ms) da semana em exibição
+let moY = new Date().getFullYear(), moM = new Date().getMonth();   // mês em exibição
 
 const FV = () => firebase.firestore.FieldValue;
 const esc = s => escapeHtml(String(s == null ? '' : s));
@@ -84,9 +86,29 @@ function curBoard(){ return view ? boards.find(b => b.id === view.id) : null; }
 function bRef(id){ return db.collection('boards').doc(id || (view && view.id)); }
 function cardById(id){ return cards.find(c => c.id === id); }
 function listName(id){ const l = lists.find(x => x.id === id); return l ? l.name : ''; }
-function sortedCards(listId){ return cards.filter(c => c.listId === listId).sort((a, b) => (a.order || 0) - (b.order || 0)); }
+function sortedCards(listId, all){ return cards.filter(c => c.listId === listId && (all || cardWeek(c) === wk)).sort((a, b) => (a.order || 0) - (b.order || 0)); }
 function toast(msg){ if(typeof showSnack === 'function') showSnack(msg); }
 function fail(err){ toast(errMsg(err)); }
+
+// semanas e meses (a agenda é preenchida semana a semana; cada mês começa vazio)
+const MESES = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+const WDAYS = { 'segunda': 0, 'terça': 1, 'terca': 1, 'quarta': 2, 'quinta': 3, 'sexta': 4, 'sábado': 5, 'sabado': 5, 'domingo': 6 };
+function weekStart(ms){ const d = new Date(ms); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.getTime(); }
+function addDays(ms, n){ const d = new Date(ms); d.setDate(d.getDate() + n); return d.getTime(); }
+function cardWeek(c){ return c.week || weekStart(tsMs(c.createdAt) || Date.now()); }
+function curWeek(){ return weekStart(Date.now()); }
+function weekOpen(w){ const c = curWeek(); return w === c || w === addDays(c, 7); }   // só a semana atual e a próxima recebem cartões
+function weeksOfMonth(y, m){ const out = []; let d = weekStart(new Date(y, m, 1).getTime()); if(new Date(d).getMonth() !== m || new Date(d).getFullYear() !== y) d = addDays(d, 7); while(new Date(d).getMonth() === m){ out.push(d); d = addDays(d, 7); } return out; }
+function shortDay(ms){ return new Date(ms).toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' }).replace('.', ''); }
+function weekLabel(w){ const ab = x => new Date(x).toLocaleDateString('pt-BR', { month: 'short' }).replace('.', ''); const e = addDays(w, 5), a = new Date(w), z = new Date(e); return a.getMonth() === z.getMonth() ? `${a.getDate()}–${z.getDate()} ${ab(e)}` : `${a.getDate()} ${ab(w)} – ${z.getDate()} ${ab(e)}`; }
+function goWeek(w){ wk = w; const d = new Date(w); moY = d.getFullYear(); moM = d.getMonth(); composing = null; mainSig = ''; renderMain(true); }
+function goMonth(delta){
+  if(delta === 0){ goWeek(curWeek()); return; }
+  const d = new Date(moY, moM + delta, 1); moY = d.getFullYear(); moM = d.getMonth();
+  const ws = weeksOfMonth(moY, moM); const c = curWeek();
+  wk = ws.includes(c) ? c : (ws.includes(addDays(c, 7)) ? addDays(c, 7) : ws[0]);
+  composing = null; mainSig = ''; renderMain(true);
+}
 
 // permissões (espelham as regras do Firestore)
 function memberRole(b){ return (b && b.members && b.members[myUid]) || ''; }
@@ -205,6 +227,23 @@ const CSS = `
 .ag-btn.danger.armed{background:var(--danger); border-color:var(--danger); color:#fff;}
 .ag-btn.sm{padding:7px 12px; font-size:13px; border-radius:9px;}
 .ag-btn:disabled{opacity:.5; cursor:default;}
+
+/* período (mês e semanas) */
+.ag-period{flex-shrink:0; padding:10px 16px 8px; background:var(--surface); border-bottom:1px solid var(--line);}
+.ag-mo{display:flex; align-items:center; gap:4px;}
+.ag-mo-t{flex:1; text-align:center; font-weight:800; font-size:16px; text-transform:capitalize; letter-spacing:-.01em;}
+.ag-mo-t i{font-style:normal; font-weight:600; color:var(--ink-soft);}
+.ag-wks{display:flex; gap:8px; overflow-x:auto; padding:10px 0 2px; scrollbar-width:none;}
+.ag-wks::-webkit-scrollbar{display:none;}
+.ag-wk{flex:0 0 auto; display:flex; flex-direction:column; align-items:flex-start; gap:1px; padding:7px 13px; border-radius:12px; border:1px solid var(--line); background:var(--surface-2); color:var(--ink); cursor:pointer; font:inherit; text-align:left; min-width:104px;}
+.ag-wk b{font-size:13.5px; font-weight:800;}
+.ag-wk span{font-size:11.5px; font-weight:600; color:var(--ink-soft);}
+.ag-wk.past{opacity:.72;}
+.ag-wk.on{background:var(--accent); border-color:var(--accent); color:var(--accent-ink); opacity:1;}
+.ag-wk.on span{color:var(--accent-ink); opacity:.85;}
+.ag-wk:focus-visible{outline:2px solid var(--accent-strong); outline-offset:2px;}
+.ag-day{font-style:normal; font-size:12px; font-weight:700; color:var(--ink-soft); margin-left:6px;}
+.ag-day.today{color:var(--accent-strong); background:var(--accent-soft); padding:1px 7px; border-radius:999px;}
 
 /* quadro */
 .ag-wrap{position:relative; flex:1; min-height:0; display:flex; flex-direction:column;}
@@ -376,7 +415,7 @@ function leave(){ cancelDrag(); closeData(); view = null; sheet = null; composin
 function openBoard(id){
   if(view && view.id === id && unsubCards){ openMain(); renderList(); renderMain(true); return; }
   closeData();
-  view = { id }; sheet = null; composing = null; mainSig = '';
+  view = { id }; sheet = null; composing = null; mainSig = ''; wk = curWeek(); moY = new Date().getFullYear(); moM = new Date().getMonth();
   const ref = bRef(id);
   unsubLists = ref.collection('lists').orderBy('order').onSnapshot(snap => {
     lists = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -455,7 +494,7 @@ function renderMain(force){
   const main = byId('mainPane'); if(!main) return;
   const b = curBoard();
   if(!view || !b){ mainSig = ''; if(typeof renderEmptyMain === 'function') renderEmptyMain(); return; }
-  const sig = JSON.stringify([b, lists, cards, sheet, comments, composing, confirmDelete, isAdmin, allUsers.length, myChatName]);
+  const sig = JSON.stringify([b, lists, cards, sheet, comments, composing, confirmDelete, wk, moY, moM, Math.floor(Date.now() / 3600000), isAdmin, allUsers.length, myChatName]);
   if(!force && sig === mainSig) return;
   mainSig = sig;
   mainKey = 'ag:' + b.id;
@@ -484,6 +523,7 @@ function renderMain(force){
     </div>
     <div class="ag-wrap">
       ${note ? `<div class="ag-note">${canAdd(b) ? I.check : lockSvg}${esc(note)}</div>` : ''}
+      ${periodHtml()}
       <div class="pane-body wallpaper" style="display:flex; flex-direction:column; overflow:hidden;">
         ${boardHtml(b, can)}
         <div class="ag-dots" id="agDots" aria-hidden="true">${lists.map((l, i) => `<i${i === 0 ? ' class="on"' : ''}></i>`).join('')}</div>
@@ -500,6 +540,22 @@ function renderMain(force){
   if(typeof applyShell === 'function') applyShell();
 }
 
+function periodHtml(){
+  const c = curWeek(), ws = weeksOfMonth(moY, moM);
+  const chips = ws.map(w => {
+    const n = cards.filter(x => cardWeek(x) === w).length;
+    const tag = w === c ? 'Esta semana' : (w === addDays(c, 7) ? 'Próxima' : '');
+    return `<button class="ag-wk${w === wk ? ' on' : ''}${w < c ? ' past' : ''}" data-ag-wk="${w}" aria-pressed="${w === wk ? 'true' : 'false'}"><b>${esc(weekLabel(w))}</b><span>${tag ? esc(tag) : (n ? n + ' cartão' + (n === 1 ? '' : 's') : '&nbsp;')}</span></button>`;
+  }).join('');
+  const isNow = moY === new Date().getFullYear() && moM === new Date().getMonth() && wk === c;
+  return `<div class="ag-period" role="group" aria-label="Período">
+    <div class="ag-mo"><button class="head-btn sm" data-ag-mo="-1" aria-label="Mês anterior">${I.left}</button>
+      <div class="ag-mo-t">${MESES[moM]} <i>${moY}</i></div>
+      <button class="head-btn sm" data-ag-mo="1" aria-label="Próximo mês">${I.right}</button>
+      <button class="ag-btn sm" data-ag-mo="0"${isNow ? ' disabled' : ''}>Hoje</button></div>
+    <div class="ag-wks">${chips}</div></div>`;
+}
+
 function boardHtml(b, can){
   if(!lists.length && !can){
     return `<div class="ag-empty-board"><b>Esta agenda ainda não tem listas</b>Quem edita a agenda cria as listas. Quando existirem, elas aparecem aqui.</div>`;
@@ -510,11 +566,13 @@ function boardHtml(b, can){
     const foot = composing === l.id
       ? `<div class="ag-compose"><textarea id="agCompose" rows="2" maxlength="300" placeholder="Título do cartão" aria-label="Título do novo cartão"></textarea>
           <div class="ag-compose-act"><button class="ag-btn pri sm" data-ag-addcard="${attr(l.id)}">Adicionar cartão</button><button class="ag-btn sm" data-ag-cancelcompose aria-label="Cancelar">${xSvg}</button></div></div>`
-      : (canAdd(b)
+      : (canAdd(b) && !weekOpen(wk)
+        ? `<div class="ag-add lock">${lockSvg}${wk < curWeek() ? 'Semana encerrada' : 'Ainda não liberada'}</div>`
+        : canAdd(b)
         ? `<button class="ag-add" data-ag-compose="${attr(l.id)}">${plusSvg}Adicionar cartão</button>`
         : `<div class="ag-add lock">${lockSvg}Somente leitura</div>`);
     return `<section class="ag-col" data-list="${attr(l.id)}" aria-label="Lista ${attr(l.name)}">
-      <header class="ag-col-h"><h3>${esc(l.name)}</h3><span class="ag-count">${cs.length}</span>
+      <header class="ag-col-h"><h3>${esc(l.name)}${dayTag(l.name)}</h3><span class="ag-count">${cs.length}</span>
         ${can ? `<button class="head-btn sm" data-ag-listmenu="${attr(l.id)}" aria-label="Opções da lista ${attr(l.name)}" title="Opções da lista">${moreSvg}</button>` : ''}</header>
       <div class="ag-cards" data-list="${attr(l.id)}">${cardsHtml}</div>
       <div class="ag-foot">${foot}</div></section>`;
@@ -526,6 +584,12 @@ function boardHtml(b, can){
     : '';
   if(!lists.length && can) return `<div class="ag-board">${newCol.replace('ag-newcol', 'ag-newcol" style="margin:auto')}</div>`;
   return `<div class="ag-board" id="agBoard">${cols}${newCol}</div>`;
+}
+
+function dayTag(name){
+  const i = WDAYS[String(name).trim().toLowerCase()]; if(i === undefined) return '';
+  const d = addDays(wk, i), t = new Date(); t.setHours(0, 0, 0, 0);
+  return ` <em class="ag-day${d === t.getTime() ? ' today' : ''}">${esc(shortDay(d))}</em>`;
 }
 
 function cardHtml(b, c){
@@ -650,6 +714,8 @@ function bindMain(main, b){
     { label: 'Excluir agenda', icon: trashSvg, danger: true, action: () => showDeleteBoardModal(b) }
   ]));
 
+  main.querySelectorAll('[data-ag-mo]').forEach(el => el.onclick = () => goMonth(+el.getAttribute('data-ag-mo')));
+  main.querySelectorAll('[data-ag-wk]').forEach(el => el.onclick = () => goWeek(+el.getAttribute('data-ag-wk')));
   main.querySelectorAll('[data-ag-compose]').forEach(el => el.onclick = () => { composing = el.getAttribute('data-ag-compose'); mainSig = ''; renderMain(true); const t = byId('agCompose'); if(t) t.focus(); });
   main.querySelectorAll('[data-ag-cancelcompose]').forEach(el => el.onclick = () => { composing = null; mainSig = ''; renderMain(true); });
   main.querySelectorAll('[data-ag-addcard]').forEach(el => el.onclick = () => submitCard(el.getAttribute('data-ag-addcard')));
@@ -815,7 +881,7 @@ function submitCard(listId){
   const last = sortedCards(listId).slice(-1)[0];
   t.value = '';
   bRef().collection('cards').add({
-    listId, title, desc: '', order: (last ? last.order : 0) + 1024, due: null, done: false, assignees: [], checklist: [],
+    listId, title, desc: '', week: wk, order: (last ? last.order : 0) + 1024, due: null, done: false, assignees: [], checklist: [],
     createdBy: myUid, createdByName: myName(), createdAt: FV().serverTimestamp(), updatedAt: FV().serverTimestamp()
   }).catch(fail);
   t.focus();
@@ -847,7 +913,7 @@ function swapLists(a, b){
   batch.commit().catch(fail);
 }
 function deleteList(l){
-  const n = sortedCards(l.id).length;
+  const n = sortedCards(l.id, true).length;
   const root = byId('modalRoot');
   root.innerHTML = `<div class="modal-bg" id="agMBg"><div class="modal" style="max-width:360px;" role="alertdialog" aria-modal="true">
     <h3>Excluir a lista “${esc(l.name)}”?</h3>
@@ -860,7 +926,7 @@ function deleteList(l){
     byId('agMYes').disabled = true;
     try{
       const batch = db.batch();
-      sortedCards(l.id).forEach(c => batch.delete(bRef().collection('cards').doc(c.id)));
+      sortedCards(l.id, true).forEach(c => batch.delete(bRef().collection('cards').doc(c.id)));
       batch.delete(bRef().collection('lists').doc(l.id));
       await batch.commit();
       close();
