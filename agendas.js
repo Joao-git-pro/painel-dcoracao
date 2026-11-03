@@ -49,6 +49,10 @@ let sheetBackPending = false;
 let confirmDelete = false;
 let fanOpen = false;
 let first = { b: true };
+let mode = 'quadro';              // quadro | dia | mes | agenda
+try{ const m = localStorage.getItem('agMode'); if(['quadro','dia','mes','agenda'].includes(m)) mode = m; }catch(e){}
+let selDay = sod(Date.now());     // dia em foco (visão Dia)
+let pickerOpen = false, pkY = new Date().getFullYear(), pkM = new Date().getMonth();
 let wk = weekStart(Date.now());   // segunda-feira (ms) da semana em exibição
 let moY = new Date().getFullYear(), moM = new Date().getMonth();   // mês em exibição
 
@@ -96,18 +100,33 @@ const WDAYS = { 'segunda': 0, 'terça': 1, 'terca': 1, 'quarta': 2, 'quinta': 3,
 function weekStart(ms){ const d = new Date(ms); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.getTime(); }
 function addDays(ms, n){ const d = new Date(ms); d.setDate(d.getDate() + n); return d.getTime(); }
 function cardWeek(c){ return c.week || weekStart(tsMs(c.createdAt) || Date.now()); }
+function sod(ms){ const d = new Date(ms); d.setHours(0, 0, 0, 0); return d.getTime(); }
+const DIAS = ['domingo','segunda-feira','terça-feira','quarta-feira','quinta-feira','sexta-feira','sábado'];
+function dayTitle(ms){ const d = new Date(ms), t = `${DIAS[d.getDay()].replace('-feira', '')}, ${d.getDate()} de ${MESES[d.getMonth()]}`; return t.charAt(0).toUpperCase() + t.slice(1); }
+function cardDate(c){
+  const l = lists.find(x => x.id === c.listId); const i = l ? WDAYS[String(l.name).trim().toLowerCase()] : undefined;
+  if(i !== undefined) return addDays(cardWeek(c), i);
+  return c.due ? sod(c.due) : cardWeek(c);
+}
+function cardsOnDay(d){ return cards.filter(c => cardDate(c) === d).sort((a, z) => (a.done - z.done) || ((a.due || a.order || 0) - (z.due || z.order || 0))); }
+function setMode(m){ mode = m; try{ localStorage.setItem('agMode', m); }catch(e){} pickerOpen = false; composing = null; mainSig = ''; renderMain(true); }
+function pickDay(d){ selDay = sod(d); pickerOpen = false; goWeek(weekStart(d)); }
+function stepPeriod(delta){
+  if(mode === 'dia'){ pickDay(addDays(selDay, delta)); return; }
+  goMonth(delta);
+}
 function curWeek(){ return weekStart(Date.now()); }
 function weekOpen(w){ const c = curWeek(); return w === c || w === addDays(c, 7); }   // só a semana atual e a próxima recebem cartões
 function weeksOfMonth(y, m){ const out = []; let d = weekStart(new Date(y, m, 1).getTime()); if(new Date(d).getMonth() !== m || new Date(d).getFullYear() !== y) d = addDays(d, 7); while(new Date(d).getMonth() === m){ out.push(d); d = addDays(d, 7); } return out; }
 function shortDay(ms){ return new Date(ms).toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' }).replace('.', ''); }
 function weekLabel(w){ const ab = x => new Date(x).toLocaleDateString('pt-BR', { month: 'short' }).replace('.', ''); const e = addDays(w, 5), a = new Date(w), z = new Date(e); return a.getMonth() === z.getMonth() ? `${a.getDate()}–${z.getDate()} ${ab(e)}` : `${a.getDate()} ${ab(w)} – ${z.getDate()} ${ab(e)}`; }
-function goWeek(w){ wk = w; const d = new Date(w); moY = d.getFullYear(); moM = d.getMonth(); composing = null; mainSig = ''; renderMain(true); }
+function goWeek(w){ wk = w; if(sod(selDay) < w || sod(selDay) > addDays(w, 6)){ const t = sod(Date.now()); selDay = (t >= w && t <= addDays(w, 6)) ? t : w; } const d = new Date(w); moY = d.getFullYear(); moM = d.getMonth(); composing = null; mainSig = ''; renderMain(true); }
 function goMonth(delta){
-  if(delta === 0){ goWeek(curWeek()); return; }
+  if(delta === 0){ selDay = sod(Date.now()); pickerOpen = false; goWeek(curWeek()); return; }
   const d = new Date(moY, moM + delta, 1); moY = d.getFullYear(); moM = d.getMonth();
   const ws = weeksOfMonth(moY, moM); const c = curWeek();
   wk = ws.includes(c) ? c : (ws.includes(addDays(c, 7)) ? addDays(c, 7) : ws[0]);
-  composing = null; mainSig = ''; renderMain(true);
+  selDay = wk; pickerOpen = false; composing = null; mainSig = ''; renderMain(true);
 }
 
 // permissões (espelham as regras do Firestore)
@@ -231,7 +250,7 @@ const CSS = `
 /* período (mês e semanas) */
 .ag-period{flex-shrink:0; padding:10px 16px 8px; background:var(--surface); border-bottom:1px solid var(--line);}
 .ag-mo{display:flex; align-items:center; gap:4px;}
-.ag-mo-t{flex:1; text-align:center; font-weight:800; font-size:16px; text-transform:capitalize; letter-spacing:-.01em;}
+.ag-mo-t{flex:1; text-align:center; font-weight:800; font-size:16px; letter-spacing:-.01em;}
 .ag-mo-t i{font-style:normal; font-weight:600; color:var(--ink-soft);}
 .ag-wks{display:flex; gap:8px; overflow-x:auto; padding:10px 0 2px; scrollbar-width:none;}
 .ag-wks::-webkit-scrollbar{display:none;}
@@ -244,6 +263,59 @@ const CSS = `
 .ag-wk:focus-visible{outline:2px solid var(--accent-strong); outline-offset:2px;}
 .ag-day{font-style:normal; font-size:12px; font-weight:700; color:var(--ink-soft); margin-left:6px;}
 .ag-day.today{color:var(--accent-strong); background:var(--accent-soft); padding:1px 7px; border-radius:999px;}
+
+.ag-tabs{display:flex; gap:4px; padding:3px; margin-bottom:8px; background:var(--surface-2); border-radius:12px;}
+.ag-tab{flex:1; padding:7px 4px; border:0; border-radius:9px; background:transparent; color:var(--ink-soft); font:inherit; font-size:13.5px; font-weight:700; cursor:pointer;}
+.ag-tab.on{background:var(--surface); color:var(--ink); box-shadow:0 1px 3px rgba(0,0,0,.12);}
+.ag-tab:focus-visible{outline:2px solid var(--accent-strong); outline-offset:1px;}
+.ag-period{position:relative;}
+.ag-mo-t{border:0; background:transparent; color:inherit; font:inherit; font-weight:800; font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px; padding:6px 8px; border-radius:10px;}
+.ag-mo-t svg{width:15px; height:15px; color:var(--ink-soft);}
+.ag-mo-t:hover{background:var(--surface-2);}
+.ag-pk-bg{position:fixed; inset:0; z-index:30;}
+.ag-pk{position:absolute; z-index:31; left:50%; transform:translateX(-50%); top:96px; width:min(320px, calc(100vw - 32px)); background:var(--surface); border:1px solid var(--line); border-radius:16px; box-shadow:0 18px 40px rgba(0,0,0,.28); padding:12px; animation:agFade .12s;}
+.ag-pk-h{display:flex; align-items:center; justify-content:space-between; text-transform:capitalize; margin-bottom:6px;}
+.ag-pk-w, .ag-pk-g{display:grid; grid-template-columns:repeat(7, 1fr); gap:2px; text-align:center;}
+.ag-pk-w i{font-style:normal; font-size:11.5px; font-weight:700; color:var(--ink-soft); padding:4px 0; text-transform:uppercase; letter-spacing:.02em;}
+.ag-pk-d{position:relative; aspect-ratio:1; border:0; border-radius:50%; background:transparent; color:var(--ink); font:inherit; font-size:14px; font-weight:600; cursor:pointer;}
+.ag-pk-d:hover{background:var(--surface-2);}
+.ag-pk-d.out{color:var(--ink-soft); opacity:.5;}
+.ag-pk-d.today{box-shadow:inset 0 0 0 1.5px var(--accent);}
+.ag-pk-d.sel{background:var(--accent); color:var(--accent-ink); opacity:1;}
+.ag-pk-d.has::after{content:''; position:absolute; bottom:4px; left:50%; width:4px; height:4px; margin-left:-2px; border-radius:50%; background:currentColor; opacity:.7;}
+.ag-view{flex:1; min-height:0; overflow-y:auto; padding:14px 16px 24px; -webkit-overflow-scrolling:touch;}
+.ag-day-card{max-width:560px; margin:0 auto; background:var(--surface-2); border:1px solid var(--line); border-radius:18px; padding:6px 10px 10px;}
+.ag-day-h{display:flex; align-items:center; justify-content:space-between; padding:10px 6px 8px;}
+.ag-day-h h3{margin:0; font-size:16px; font-weight:800;}
+.ag-day-l{display:flex; flex-direction:column; gap:8px;}
+.ag-nothing{padding:18px 6px; color:var(--ink-soft); font-size:14px;}
+.ag-ag-day{max-width:560px; margin:0 auto 14px; display:flex; flex-direction:column; gap:8px;}
+.ag-ag-day h3{margin:4px 2px 0; font-size:14px; font-weight:800; color:var(--ink-soft); display:flex; align-items:center; gap:8px;}
+.ag-ag-day h3.today{color:var(--accent-strong);}
+.ag-ag-day h3 em{font-style:normal; font-size:11px; background:var(--accent); color:var(--accent-ink); padding:2px 8px; border-radius:999px;}
+.ag-mgrid{max-width:980px; margin:0 auto; background:var(--surface); border:1px solid var(--line); border-radius:16px; overflow:hidden;}
+.ag-mh, .ag-mb{display:grid; grid-template-columns:repeat(7, minmax(0, 1fr));}
+.ag-mh i{font-style:normal; text-align:center; padding:8px 0; font-size:12px; font-weight:700; text-transform:uppercase; color:var(--ink-soft); border-bottom:1px solid var(--line); background:var(--surface-2);}
+.ag-mc{min-height:92px; display:flex; flex-direction:column; align-items:stretch; gap:3px; padding:6px; border:0; border-right:1px solid var(--line); border-bottom:1px solid var(--line); background:var(--surface); color:var(--ink); font:inherit; text-align:left; cursor:pointer; overflow:hidden;}
+.ag-mc:nth-child(7n){border-right:0;}
+.ag-mc:hover{background:var(--surface-2);}
+.ag-mc.out{background:var(--surface-2); opacity:.6;}
+.ag-mc.sel{box-shadow:inset 0 0 0 2px var(--accent);}
+.ag-mc-n{align-self:flex-end; font-size:13px; font-weight:700; min-width:24px; height:24px; display:inline-flex; align-items:center; justify-content:center; border-radius:50%;}
+.ag-mc.today .ag-mc-n{background:var(--accent); color:var(--accent-ink);}
+.ag-ev{font-size:11.5px; font-weight:600; padding:2px 6px; border-radius:6px; background:var(--accent-soft); color:var(--accent-strong); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.ag-ev.done{opacity:.55; text-decoration:line-through;}
+.ag-ev.late{background:rgba(193,80,61,.14); color:var(--danger);}
+.ag-ev.more{background:transparent; color:var(--ink-soft);}
+.ag-dotn{display:none; font-size:14px; line-height:1; color:var(--accent-strong); letter-spacing:1px; align-self:center;}
+@media (max-width:768px), (pointer:coarse) and (max-height:520px){
+  .ag-mc{min-height:56px; align-items:center; padding:4px 2px;}
+  .ag-mc-n{align-self:center;}
+  .ag-ev{display:none;}
+  .ag-dotn{display:block;}
+  .ag-view{padding:12px 12px 24px;}
+  .ag-pk{top:112px;}
+}
 
 /* quadro */
 .ag-wrap{position:relative; flex:1; min-height:0; display:flex; flex-direction:column;}
@@ -494,7 +566,7 @@ function renderMain(force){
   const main = byId('mainPane'); if(!main) return;
   const b = curBoard();
   if(!view || !b){ mainSig = ''; if(typeof renderEmptyMain === 'function') renderEmptyMain(); return; }
-  const sig = JSON.stringify([b, lists, cards, sheet, comments, composing, confirmDelete, wk, moY, moM, Math.floor(Date.now() / 3600000), isAdmin, allUsers.length, myChatName]);
+  const sig = JSON.stringify([b, lists, cards, sheet, comments, composing, confirmDelete, wk, moY, moM, mode, selDay, pickerOpen, pkY, pkM, Math.floor(Date.now() / 3600000), isAdmin, allUsers.length, myChatName]);
   if(!force && sig === mainSig) return;
   mainSig = sig;
   mainKey = 'ag:' + b.id;
@@ -504,6 +576,7 @@ function renderMain(force){
   const keepX = board ? board.scrollLeft : 0;
   const keepY = {};
   main.querySelectorAll('.ag-cards').forEach(el => { keepY[el.getAttribute('data-list')] = el.scrollTop; });
+  const viewEl = main.querySelector('.ag-view'); const keepViewY = viewEl ? viewEl.scrollTop : 0;
   const sheetBody = main.querySelector('.ag-sh-body');
   const keepSheetY = sheetBody ? sheetBody.scrollTop : 0;
   // título e descrição só são preservados enquanto a pessoa está digitando neles
@@ -525,8 +598,8 @@ function renderMain(force){
       ${note ? `<div class="ag-note">${canAdd(b) ? I.check : lockSvg}${esc(note)}</div>` : ''}
       ${periodHtml()}
       <div class="pane-body wallpaper" style="display:flex; flex-direction:column; overflow:hidden;">
-        ${boardHtml(b, can)}
-        <div class="ag-dots" id="agDots" aria-hidden="true">${lists.map((l, i) => `<i${i === 0 ? ' class="on"' : ''}></i>`).join('')}</div>
+        ${mode === 'quadro' ? boardHtml(b, can) : viewHtml(b)}
+        ${mode === 'quadro' ? `<div class="ag-dots" id="agDots" aria-hidden="true">${lists.map((l, i) => `<i${i === 0 ? ' class="on"' : ''}></i>`).join('')}</div>` : ''}
       </div>
     </div>
     ${sheet ? sheetHtml(b) : ''}`;
@@ -536,24 +609,93 @@ function renderMain(force){
   const nb = main.querySelector('.ag-board'); if(nb) nb.scrollLeft = keepX;
   main.querySelectorAll('.ag-cards').forEach(el => { const y = keepY[el.getAttribute('data-list')]; if(y) el.scrollTop = y; });
   const sb = main.querySelector('.ag-sh-body'); if(sb) sb.scrollTop = keepSheetY;
+  const nv = main.querySelector('.ag-view'); if(nv) nv.scrollTop = keepViewY;
   updateDots();
   if(typeof applyShell === 'function') applyShell();
 }
 
 function periodHtml(){
   const c = curWeek(), ws = weeksOfMonth(moY, moM);
-  const chips = ws.map(w => {
+  const chips = mode !== 'quadro' ? '' : `<div class="ag-wks">${ws.map(w => {
     const n = cards.filter(x => cardWeek(x) === w).length;
     const tag = w === c ? 'Esta semana' : (w === addDays(c, 7) ? 'Próxima' : '');
     return `<button class="ag-wk${w === wk ? ' on' : ''}${w < c ? ' past' : ''}" data-ag-wk="${w}" aria-pressed="${w === wk ? 'true' : 'false'}"><b>${esc(weekLabel(w))}</b><span>${tag ? esc(tag) : (n ? n + ' cartão' + (n === 1 ? '' : 's') : '&nbsp;')}</span></button>`;
-  }).join('');
-  const isNow = moY === new Date().getFullYear() && moM === new Date().getMonth() && wk === c;
+  }).join('')}</div>`;
+  const today = sod(Date.now());
+  const isNow = mode === 'dia' ? selDay === today : (moY === new Date().getFullYear() && moM === new Date().getMonth() && (mode !== 'quadro' || wk === c));
+  const title = mode === 'dia' ? `<span class="ag-mo-d">${esc(dayTitle(selDay))}</span>` : `${MESES[moM]} <i>${moY}</i>`;
+  const tabs = [['quadro', 'Quadro'], ['dia', 'Dia'], ['mes', 'Mês'], ['agenda', 'Agenda']].map(([k, l]) => `<button role="tab" class="ag-tab${mode === k ? ' on' : ''}" data-ag-mode="${k}" aria-selected="${mode === k}">${l}</button>`).join('');
   return `<div class="ag-period" role="group" aria-label="Período">
-    <div class="ag-mo"><button class="head-btn sm" data-ag-mo="-1" aria-label="Mês anterior">${I.left}</button>
-      <div class="ag-mo-t">${MESES[moM]} <i>${moY}</i></div>
-      <button class="head-btn sm" data-ag-mo="1" aria-label="Próximo mês">${I.right}</button>
+    <div class="ag-tabs" role="tablist" aria-label="Modo de exibição">${tabs}</div>
+    <div class="ag-mo"><button class="head-btn sm" data-ag-step="-1" aria-label="Anterior">${I.left}</button>
+      <button class="ag-mo-t" data-ag-picker aria-haspopup="dialog" aria-expanded="${pickerOpen}">${title}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
+      <button class="head-btn sm" data-ag-step="1" aria-label="Próximo">${I.right}</button>
       <button class="ag-btn sm" data-ag-mo="0"${isNow ? ' disabled' : ''}>Hoje</button></div>
-    <div class="ag-wks">${chips}</div></div>`;
+    ${chips}${pickerOpen ? pickerHtml() : ''}</div>`;
+}
+
+function pickerHtml(){
+  const first = new Date(pkY, pkM, 1), start = weekStart(first.getTime()), today = sod(Date.now());
+  const has = new Set(cards.map(cardDate));
+  let cells = '';
+  for(let i = 0; i < 42; i++){
+    const d = addDays(start, i), dt = new Date(d), out = dt.getMonth() !== pkM;
+    if(i % 7 === 0 && i >= 35 && out) break;
+    cells += `<button class="ag-pk-d${out ? ' out' : ''}${d === today ? ' today' : ''}${d === selDay ? ' sel' : ''}${has.has(d) ? ' has' : ''}" data-ag-pkday="${d}" aria-label="${esc(dayTitle(d))}">${dt.getDate()}</button>`;
+  }
+  return `<div class="ag-pk-bg" data-ag-pkclose></div><div class="ag-pk" role="dialog" aria-label="Escolher data">
+    <div class="ag-pk-h"><button class="head-btn sm" data-ag-pkmo="-1" aria-label="Mês anterior">${I.left}</button><b>${MESES[pkM]} ${pkY}</b><button class="head-btn sm" data-ag-pkmo="1" aria-label="Próximo mês">${I.right}</button></div>
+    <div class="ag-pk-w">${['seg','ter','qua','qui','sex','sáb','dom'].map(x => `<i>${x}</i>`).join('')}</div>
+    <div class="ag-pk-g">${cells}</div>
+    <button class="ag-btn sm" data-ag-pkday="${today}" style="margin-top:8px; width:100%">Ir para hoje</button></div>`;
+}
+
+// ---------- visões Dia, Mês e Agenda ----------
+function viewHtml(b){
+  let inner = '';
+  if(mode === 'dia') inner = diaHtml(b);
+  else if(mode === 'mes') inner = mesHtml();
+  else inner = agendaHtml(b);
+  return `<div class="ag-view" id="agView">${inner}</div>`;
+}
+function miniCard(b, c){
+  const l = lists.find(x => x.id === c.listId);
+  const tag = l && WDAYS[String(l.name).trim().toLowerCase()] === undefined ? `<span class="ag-chip">${esc(l.name)}</span>` : '';
+  return cardHtml(b, c, tag);
+}
+function diaHtml(b){
+  const list = cardsOnDay(selDay);
+  const open = canAdd(b) && weekOpen(weekStart(selDay));
+  const foot = composing === '__day'
+    ? `<div class="ag-compose"><textarea id="agCompose" rows="2" maxlength="300" placeholder="Título do cartão" aria-label="Título do novo cartão"></textarea><div class="ag-compose-act"><button class="ag-btn pri sm" data-ag-addcard="__day">Adicionar cartão</button><button class="ag-btn sm" data-ag-cancelcompose aria-label="Cancelar">${xSvg}</button></div></div>`
+    : (open ? `<button class="ag-add" data-ag-compose="__day">${plusSvg}Adicionar cartão</button>`
+      : `<div class="ag-add lock">${lockSvg}${!canAdd(b) ? 'Somente leitura' : (weekStart(selDay) < curWeek() ? 'Semana encerrada' : 'Ainda não liberada')}</div>`);
+  return `<div class="ag-day-card"><div class="ag-day-h"><h3>${list.length ? list.length + (list.length === 1 ? ' cartão' : ' cartões') : 'Livre'}</h3>${selDay === sod(Date.now()) ? '<span class="ag-count">Hoje</span>' : ''}</div>
+    <div class="ag-day-l">${list.length ? list.map(c => miniCard(b, c)).join('') : '<div class="ag-nothing">Nada planejado para este dia.</div>'}</div>
+    <div class="ag-foot">${foot}</div></div>`;
+}
+function mesHtml(){
+  const start = weekStart(new Date(moY, moM, 1).getTime()), today = sod(Date.now());
+  const heads = ['seg','ter','qua','qui','sex','sáb','dom'].map(x => `<i>${x}</i>`).join('');
+  let cells = '';
+  for(let i = 0; i < 42; i++){
+    const d = addDays(start, i), dt = new Date(d), out = dt.getMonth() !== moM;
+    if(i % 7 === 0 && i >= 35 && out) break;
+    const cs = cardsOnDay(d), shown = cs.slice(0, 3);
+    cells += `<button class="ag-mc${out ? ' out' : ''}${d === today ? ' today' : ''}${d === selDay ? ' sel' : ''}" data-ag-day="${d}" aria-label="${esc(dayTitle(d))}, ${cs.length} cartão(ões)">
+      <span class="ag-mc-n">${dt.getDate()}</span>
+      ${shown.map(c => `<span class="ag-ev${c.done ? ' done' : ''}${!c.done && c.due && c.due < Date.now() ? ' late' : ''}">${esc(c.title)}</span>`).join('')}
+      ${cs.length > 3 ? `<span class="ag-ev more">+${cs.length - 3}</span>` : ''}
+      ${cs.length ? `<span class="ag-dotn">${cs.length > 3 ? '3+' : '•'.repeat(cs.length)}</span>` : ''}</button>`;
+  }
+  return `<div class="ag-mgrid"><div class="ag-mh">${heads}</div><div class="ag-mb">${cells}</div></div>`;
+}
+function agendaHtml(b){
+  const days = [], last = new Date(moY, moM + 1, 0).getDate();
+  for(let i = 1; i <= last; i++){ const d = new Date(moY, moM, i).getTime(); const cs = cardsOnDay(d); if(cs.length) days.push([d, cs]); }
+  if(!days.length) return `<div class="ag-empty-board" style="margin:40px auto"><b>Nada planejado em ${MESES[moM]}</b>Use o modo Quadro ou Dia para incluir cartões na semana atual ou na próxima.</div>`;
+  const today = sod(Date.now());
+  return days.map(([d, cs]) => `<section class="ag-ag-day"><h3${d === today ? ' class="today"' : ''}>${esc(dayTitle(d))}${d === today ? '<em>Hoje</em>' : ''}</h3>${cs.map(c => miniCard(b, c)).join('')}</section>`).join('');
 }
 
 function boardHtml(b, can){
@@ -592,7 +734,7 @@ function dayTag(name){
   return ` <em class="ag-day${d === t.getTime() ? ' today' : ''}">${esc(shortDay(d))}</em>`;
 }
 
-function cardHtml(b, c){
+function cardHtml(b, c, extra){
   const d = dueInfo(c);
   const can = canEditCard(b, c);
   const cl = c.checklist || [];
@@ -600,14 +742,14 @@ function cardHtml(b, c){
   const late = !c.done && c.due && c.due < Date.now();
   const by = c.createdBy && c.createdBy !== myUid && c.createdBy !== b.ownerUid ? `<span class="ag-by">de ${esc(firstName(c.createdByName) || userName(c.createdBy))}</span>` : '';
   const avs = (c.assignees || []).slice(0, 3).map(u => avatarHtml(userName(u), u)).join('');
-  return `<article class="ag-card${c.done ? ' done' : ''}${late ? ' late' : ''}" tabindex="0" role="button" data-card="${attr(c.id)}"${can ? ' data-drag="1"' : ''} aria-label="Cartão ${attr(c.title)}">
+  return `<article class="ag-card${c.done ? ' done' : ''}${late ? ' late' : ''}" tabindex="0" role="button" data-card="${attr(c.id)}"${can && mode === 'quadro' ? ' data-drag="1"' : ''} aria-label="Cartão ${attr(c.title)}">
     ${can ? `<button class="ag-check${c.done ? ' on' : ''}" data-ag-done="${attr(c.id)}" aria-pressed="${c.done ? 'true' : 'false'}" aria-label="${c.done ? 'Marcar como não concluído' : 'Marcar como concluído'}">${I.check}</button>`
           : `<span class="ag-check static${c.done ? ' on' : ''}" aria-hidden="true">${I.check}</span>`}
     <div class="ag-cbody"><div class="ag-ct">${esc(c.title)}</div>
-      ${(d || cl.length || by || avs) ? `<div class="ag-meta">
+      ${(d || cl.length || by || avs || extra) ? `<div class="ag-meta">
         ${d ? `<span class="ag-chip ${d.tone}">${I.cal}${esc(d.label)}</span>` : ''}
         ${cl.length ? `<span class="ag-chip${done === cl.length ? ' ok' : ''}">${I.list}${done}/${cl.length}</span>` : ''}
-        ${by}${avs ? `<span class="ag-avs">${avs}</span>` : ''}</div>` : ''}
+        ${extra || ''}${by}${avs ? `<span class="ag-avs">${avs}</span>` : ''}</div>` : (extra ? `<div class="ag-meta">${extra}</div>` : '')}
     </div></article>`;
 }
 
@@ -715,6 +857,13 @@ function bindMain(main, b){
   ]));
 
   main.querySelectorAll('[data-ag-mo]').forEach(el => el.onclick = () => goMonth(+el.getAttribute('data-ag-mo')));
+  main.querySelectorAll('[data-ag-step]').forEach(el => el.onclick = () => stepPeriod(+el.getAttribute('data-ag-step')));
+  main.querySelectorAll('[data-ag-mode]').forEach(el => el.onclick = () => setMode(el.getAttribute('data-ag-mode')));
+  q('[data-ag-picker]', el => el.onclick = () => { pickerOpen = !pickerOpen; pkY = moY; pkM = moM; if(mode === 'dia'){ const d = new Date(selDay); pkY = d.getFullYear(); pkM = d.getMonth(); } mainSig = ''; renderMain(true); });
+  main.querySelectorAll('[data-ag-pkclose]').forEach(el => el.onclick = () => { pickerOpen = false; mainSig = ''; renderMain(true); });
+  main.querySelectorAll('[data-ag-pkmo]').forEach(el => el.onclick = () => { const d = new Date(pkY, pkM + +el.getAttribute('data-ag-pkmo'), 1); pkY = d.getFullYear(); pkM = d.getMonth(); mainSig = ''; renderMain(true); });
+  main.querySelectorAll('[data-ag-pkday]').forEach(el => el.onclick = () => pickDay(+el.getAttribute('data-ag-pkday')));
+  main.querySelectorAll('[data-ag-day]').forEach(el => el.onclick = () => { mode = 'dia'; try{ localStorage.setItem('agMode', 'dia'); }catch(e){} pickDay(+el.getAttribute('data-ag-day')); });
   main.querySelectorAll('[data-ag-wk]').forEach(el => el.onclick = () => goWeek(+el.getAttribute('data-ag-wk')));
   main.querySelectorAll('[data-ag-compose]').forEach(el => el.onclick = () => { composing = el.getAttribute('data-ag-compose'); mainSig = ''; renderMain(true); const t = byId('agCompose'); if(t) t.focus(); });
   main.querySelectorAll('[data-ag-cancelcompose]').forEach(el => el.onclick = () => { composing = null; mainSig = ''; renderMain(true); });
@@ -878,10 +1027,18 @@ function submitCard(listId){
   const t = byId('agCompose'); if(!t) return;
   const title = t.value.trim().replace(/\s+/g, ' ');
   if(!title){ t.focus(); return; }
-  const last = sortedCards(listId).slice(-1)[0];
+  let extra = {}, w = wk;
+  if(listId === '__day'){
+    w = weekStart(selDay);
+    const target = lists.find(l => WDAYS[String(l.name).trim().toLowerCase()] === (new Date(selDay).getDay() + 6) % 7) || lists.find(l => !/conclu/i.test(l.name)) || lists[0];
+    if(!target){ toast('Crie uma lista antes de incluir cartões'); return; }
+    listId = target.id;
+    if(WDAYS[String(target.name).trim().toLowerCase()] === undefined) extra.due = selDay + 9 * 3600000;
+  }
+  const last = cards.filter(c => c.listId === listId && cardWeek(c) === w).sort((a, z) => (a.order || 0) - (z.order || 0)).slice(-1)[0];
   t.value = '';
   bRef().collection('cards').add({
-    listId, title, desc: '', week: wk, order: (last ? last.order : 0) + 1024, due: null, done: false, assignees: [], checklist: [],
+    listId, title, desc: '', week: w, order: (last ? last.order : 0) + 1024, due: extra.due || null, done: false, assignees: [], checklist: [],
     createdBy: myUid, createdByName: myName(), createdAt: FV().serverTimestamp(), updatedAt: FV().serverTimestamp()
   }).catch(fail);
   t.focus();
