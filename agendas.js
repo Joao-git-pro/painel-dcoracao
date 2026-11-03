@@ -1024,6 +1024,9 @@ function membersSheetHtml(b){
     <div class="ag-sh-head"><button class="head-btn" id="agSheetClose" aria-label="Fechar" title="Fechar">${xSvg}</button><h2>Membros e permissões</h2></div>
     <div class="ag-sh-body">
       ${rows}
+      ${manage ? `<div class="ag-block"><div class="ag-lbl">Responsável pela agenda</div>
+        <select class="ag-select" id="agResp" aria-label="Responsável pela agenda"><option value="">Ninguém (escolher em cada cartão)</option>${uids.map(u => `<option value="${attr(u)}"${b.responsible === u ? ' selected' : ''}>${esc(userName(u))}${u === myUid ? ' (você)' : ''}</option>`).join('')}</select>
+        <div class="ag-hint">Os cartões novos já vêm com essa pessoa como responsável e ela recebe o aviso no celular.</div></div>` : (b.responsible ? `<div class="ag-info"><b>Responsável pela agenda:</b> ${esc(userName(b.responsible))}</div>` : '')}
       ${manage ? `<div class="ag-block"><div class="ag-lbl">${userPlusSvg}Adicionar pessoa</div>
         ${candidates.length ? `<div class="ag-roww"><select class="ag-select" id="agAddWho" aria-label="Pessoa">${candidates.map(u => `<option value="${attr(u.uid)}">${esc(displayNameFor(u))}</option>`).join('')}</select>
           <select class="ag-select" id="agAddRole" style="width:140px" aria-label="Papel">${['colab', 'editor', 'leitor'].map(r => `<option value="${r}">${ROLES[r]}</option>`).join('')}</select></div>
@@ -1124,6 +1127,7 @@ function bindSheet(main, b){
   if(sheet.kind === 'members'){
     main.querySelectorAll('[data-ag-role]').forEach(el => el.onchange = () => setMemberRole(el.getAttribute('data-ag-role'), el.value));
     main.querySelectorAll('[data-ag-rm]').forEach(el => el.onclick = () => removeMember(el.getAttribute('data-ag-rm')));
+    q('#agResp', el => el.onchange = () => bRef().update({ responsible: el.value || null, updatedAt: FV().serverTimestamp() }).then(() => toast(el.value ? userName(el.value) + ' é o responsável pela agenda' : 'Sem responsável geral')).catch(fail));
     q('#agAddRole', el => el.onchange = () => { const h = byId('agRoleHint'); if(h) h.textContent = ROLE_HELP[el.value] || ''; });
     q('#agAddMember', el => el.onclick = () => addMember(byId('agAddWho').value, byId('agAddRole').value));
     return;
@@ -1213,6 +1217,10 @@ function moveToList(c, listId){
   patchCard(c.id, { listId, order: (last ? last.order : 0) + 1024 });
 }
 // avisa no celular de quem foi escolhido como responsável (servidor de push)
+function defAssignees(){
+  const b = curBoard(); const r = b && b.responsible;
+  return r && (b.memberUids || []).includes(r) ? [r] : [];
+}
 function notifyAssign(cardId, uids){
   const list = (uids || []).filter(u => u && u !== myUid);
   if(!list.length) return;
@@ -1272,9 +1280,9 @@ function submitCard(listId){
   const last = cards.filter(c => c.listId === listId && cardWeek(c) === w).sort((a, z) => (a.order || 0) - (z.order || 0)).slice(-1)[0];
   t.value = '';
   bRef().collection('cards').add({
-    listId, title, desc: '', week: w, order: (last ? last.order : 0) + 1024, due: extra.due || null, done: false, assignees: [], checklist: [],
+    listId, title, desc: '', week: w, order: (last ? last.order : 0) + 1024, due: extra.due || null, done: false, assignees: defAssignees(), checklist: [],
     createdBy: myUid, createdByName: myName(), createdAt: FV().serverTimestamp(), updatedAt: FV().serverTimestamp()
-  }).catch(fail);
+  }).then(ref => notifyAssign(ref.id, defAssignees())).catch(fail);
   t.focus();
 }
 function addInbox(){
@@ -1285,9 +1293,9 @@ function addInbox(){
   const last = cards.filter(c => c.listId === target.id).sort((a, z) => (a.order || 0) - (z.order || 0)).slice(-1)[0];
   t.value = '';
   bRef().collection('cards').add({
-    listId: target.id, title, desc: '', week: curWeek(), order: (last ? last.order : 0) + 1024, due: null, done: false, assignees: [], checklist: [],
+    listId: target.id, title, desc: '', week: curWeek(), order: (last ? last.order : 0) + 1024, due: null, done: false, assignees: defAssignees(), checklist: [],
     createdBy: myUid, createdByName: myName(), createdAt: FV().serverTimestamp(), updatedAt: FV().serverTimestamp()
-  }).catch(fail);
+  }).then(ref => notifyAssign(ref.id, defAssignees())).catch(fail);
   t.focus();
 }
 function createModal(pre){
@@ -1306,14 +1314,14 @@ function createModal(pre){
     <div class="ag-lbl" style="margin-top:10px">Lista</div>
     <select class="ag-select" id="agCList">${lists.map(l => `<option value="${attr(l.id)}"${def && l.id === def.id ? ' selected' : ''}>${esc(l.name)}</option>`).join('')}</select>
     <div class="ag-lbl" style="margin-top:10px">Responsável (recebe aviso no celular)</div>
-    <div class="ag-ppl" id="agCPpl">${(b.memberUids || []).map(u => `<button type="button" class="ag-p" data-u="${attr(u)}" aria-pressed="false">${avatarHtml(userName(u), u)}${esc(u === myUid ? 'Eu' : firstName(userName(u)))}</button>`).join('')}</div>
+    <div class="ag-ppl" id="agCPpl">${(b.memberUids || []).map(u => `<button type="button" class="ag-p${defAssignees().includes(u) ? ' on' : ''}" data-u="${attr(u)}" aria-pressed="${defAssignees().includes(u) ? 'true' : 'false'}">${avatarHtml(userName(u), u)}${esc(u === myUid ? 'Eu' : firstName(userName(u)))}</button>`).join('')}</div>
     <div class="ag-hint" id="agCErr" style="color:var(--danger); min-height:18px; margin-top:6px"></div>
     <div class="actions"><button class="cancel" id="agCNo">Cancelar</button><button class="confirm" id="agCYes">Criar cartão</button></div></div></div>`;
   const close = () => { root.innerHTML = ''; };
   byId('agCNo').onclick = close;
   byId('agCBg').onclick = e => { if(e.target.id === 'agCBg') close(); };
   const dEl = byId('agCDate'), lEl = byId('agCList'), err = byId('agCErr');
-  const picked = new Set();
+  const picked = new Set(defAssignees());
   byId('agCPpl').onclick = e => { const bt = e.target.closest('[data-u]'); if(!bt) return; const u = bt.dataset.u;
     if(picked.has(u)){ picked.delete(u); bt.classList.remove('on'); bt.setAttribute('aria-pressed', 'false'); } else { picked.add(u); bt.classList.add('on'); bt.setAttribute('aria-pressed', 'true'); } };
   dEl.onchange = () => { const d = dEl.value ? new Date(dEl.value + 'T00:00').getTime() : null; const l = d && dayListFor(d); if(l && isDayList(lists.find(x => x.id === lEl.value))) lEl.value = l.id; };
@@ -1490,7 +1498,7 @@ function setMemberRole(uid, role){
   bRef().update({ ['members.' + uid]: role, updatedAt: FV().serverTimestamp() }).catch(fail);
 }
 function removeMember(uid){
-  bRef().update({ ['members.' + uid]: FV().delete(), memberUids: FV().arrayRemove(uid), updatedAt: FV().serverTimestamp() }).catch(fail);
+  bRef().update({ ['members.' + uid]: FV().delete(), memberUids: FV().arrayRemove(uid), ...(((curBoard() || {}).responsible) === uid ? { responsible: null } : {}), updatedAt: FV().serverTimestamp() }).catch(fail);
 }
 function addMember(uid, role){
   if(!uid) return;
