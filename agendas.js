@@ -59,6 +59,8 @@ try{
 function savePref(){ try{ localStorage.setItem('agMode', mode); localStorage.setItem('agCustomN', String(customN)); localStorage.setItem('agFit', fit ? '1' : '0'); }catch(e){} }
 let filter = { q: '', who: '', st: '' }, filterOpen = false;
 let cdrag = null;
+let trayTab = 'dia';
+const mobileLayout = () => { try{ return window.matchMedia('(max-width:768px), (pointer:coarse) and (max-height:520px)').matches; }catch(e){ return false; } };
 let selDay = sod(Date.now());     // dia em foco (visão Dia)
 let pickerOpen = false, pkY = new Date().getFullYear(), pkM = new Date().getMonth();
 let wk = weekStart(Date.now());   // segunda-feira (ms) da semana em exibição
@@ -420,6 +422,19 @@ body.ag-dragging{user-select:none; -webkit-user-select:none; cursor:grabbing;}
 .ag-more{font-size:11.5px; color:var(--ink-soft); font-weight:700; padding-left:4px;}
 .ag-ag-day{transition:background-color .12s; border-radius:12px;}
 
+.ag-tray{display:none;}
+@media (max-width:768px), (pointer:coarse) and (max-height:520px){
+  .ag-tray{display:block; margin:12px auto 0; max-width:560px; background:var(--surface-2); border:1px solid var(--line); border-radius:16px; padding:6px 10px 10px;}
+  .ag-tray-t{display:flex; gap:4px; padding:4px 0 8px;}
+  .ag-tray-t button{flex:1; padding:8px 6px; border:0; border-radius:10px; background:transparent; color:var(--ink-soft); font:inherit; font-size:13.5px; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;}
+  .ag-tray-t button.on{background:var(--surface); color:var(--ink); box-shadow:0 1px 3px rgba(0,0,0,.12);}
+  .ag-tray-l{display:flex; flex-direction:column; gap:8px; border-radius:12px; padding:2px;}
+  .ag-tray-l.drop{background:var(--accent-soft);}
+  .ag-tray .ag-inbox{margin:0; border:0; padding:0; background:transparent;}
+  .ag-mc.sel .ag-mc-n{background:var(--accent-soft); color:var(--accent-strong);}
+  .ag-mc.today.sel .ag-mc-n{background:var(--accent); color:var(--accent-ink);}
+}
+
 /* quadro */
 .ag-wrap{position:relative; flex:1; min-height:0; display:flex; flex-direction:column;}
 .ag-note{padding:8px 16px; font-size:12.5px; font-weight:600; color:var(--accent-strong); background:var(--accent-soft); display:flex; align-items:center; gap:8px; flex-shrink:0;}
@@ -669,7 +684,7 @@ function renderMain(force){
   const main = byId('mainPane'); if(!main) return;
   const b = curBoard();
   if(!view || !b){ mainSig = ''; if(typeof renderEmptyMain === 'function') renderEmptyMain(); return; }
-  const sig = JSON.stringify([b, lists, cards, sheet, comments, composing, confirmDelete, wk, moY, moM, mode, selDay, pickerOpen, pkY, pkM, customN, fit, filter, filterOpen, Math.floor(Date.now() / 3600000), isAdmin, allUsers.length, myChatName]);
+  const sig = JSON.stringify([b, lists, cards, sheet, comments, composing, confirmDelete, wk, moY, moM, mode, selDay, pickerOpen, pkY, pkM, customN, fit, filter, filterOpen, trayTab, Math.floor(Date.now() / 3600000), isAdmin, allUsers.length, myChatName]);
   if(!force && sig === mainSig) return;
   mainSig = sig;
   mainKey = 'ag:' + b.id;
@@ -798,7 +813,14 @@ function mesHtml(){
       ${cs.length > 3 ? `<span class="ag-more">+${cs.length - 3}</span>` : ''}
       ${cs.length ? `<span class="ag-dotn">${cs.length > 3 ? '3+' : '•'.repeat(cs.length)}</span>` : ''}</div>`;
   }
-  return `<div class="ag-mgrid"><div class="ag-mh">${heads}</div><div class="ag-mb">${cells}</div></div>`;
+  const b = curBoard(), dayCs = cardsOnDay(selDay), inbN = cards.filter(c => vis(c) && isInbox(c)).length;
+  const openDay = canAdd(b) && weekOpen(weekStart(selDay));
+  const tray = `<div class="ag-tray"><div class="ag-tray-t" role="tablist">
+      <button role="tab" class="${trayTab === 'dia' ? 'on' : ''}" data-ag-tray="dia" aria-selected="${trayTab === 'dia'}">${esc(cap(new Date(selDay).toLocaleDateString('pt-BR', { weekday: 'short', day: 'numeric', month: 'short' }).replace(/\./g, '')))} <span class="ag-count">${dayCs.length}</span></button>
+      <button role="tab" class="${trayTab === 'caixa' ? 'on' : ''}" data-ag-tray="caixa" aria-selected="${trayTab === 'caixa'}">Caixa de entrada <span class="ag-count">${inbN}</span></button></div>
+    <div class="ag-tray-b">${trayTab === 'caixa' ? inboxHtml(b, true, true)
+      : `<div class="ag-tray-l" data-drop-day="${selDay}">${dayCs.length ? dayCs.map(c => miniCard(b, c)).join('') : '<div class="ag-nothing">Nada planejado para este dia.</div>'}</div>${openDay ? `<button class="ag-add" data-ag-create="${selDay}">${plusSvg}Adicionar cartão neste dia</button>` : ''}`}</div></div>`;
+  return `<div class="ag-mgrid"><div class="ag-mh">${heads}</div><div class="ag-mb">${cells}</div></div>${tray}`;
 }
 function agendaHtml(b){
   const days = [], last = new Date(moY, moM + 1, 0).getDate();
@@ -851,13 +873,13 @@ function gridHtml(b){
     <div class="ag-gall"><div class="ag-gcorner"><span>dia todo</span></div>${allday}</div>
     <div class="ag-grid"><div class="ag-gutter">${gutter}</div>${cols}</div></div></div>`;
 }
-function inboxHtml(b, full){
+function inboxHtml(b, full, noAdd){
   const list = cards.filter(c => vis(c) && isInbox(c)).sort((a, z) => (a.order || 0) - (z.order || 0));
   const canNew = canAdd(b);
   return `<section class="ag-inbox${full ? ' full' : ''}" data-drop-inbox="1" aria-label="Caixa de entrada">
     <div class="ag-inb-h"><h3>Caixa de entrada</h3><span class="ag-count">${list.length}</span></div>
-    <div class="ag-inb-hint">Cartões sem data. ${full ? 'Toque para abrir e definir a data.' : 'Arraste para o calendário para agendar.'}</div>
-    ${canNew ? `<div class="ag-inb-add"><input id="agInbIn" class="ag-field" maxlength="300" placeholder="Adicionar um cartão" aria-label="Novo cartão na caixa de entrada"><button class="ag-btn pri sm" id="agInbBtn" aria-label="Adicionar">${plusSvg}</button></div>` : ''}
+    <div class="ag-inb-hint">Cartões sem data. ${full ? 'Segure e arraste para um dia do calendário, ou toque para abrir.' : 'Arraste para o calendário para agendar.'}</div>
+    ${canNew && !noAdd ? `<div class="ag-inb-add"><input id="agInbIn" class="ag-field" maxlength="300" placeholder="Adicionar um cartão" aria-label="Novo cartão na caixa de entrada"><button class="ag-btn pri sm" id="agInbBtn" aria-label="Adicionar">${plusSvg}</button></div>` : ''}
     <div class="ag-inb-l">${list.length ? list.map(c => `<div class="ag-inb${c.done ? ' done' : ''}" tabindex="0" role="button" data-card="${attr(c.id)}" data-evdrag="1">${esc(c.title)}</div>`).join('') : '<div class="ag-nothing">Nada por aqui. Cartões sem data aparecem nesta caixa.</div>'}</div></section>`;
 }
 
@@ -905,7 +927,7 @@ function cardHtml(b, c, extra){
   const late = !c.done && c.due && c.due < Date.now();
   const by = c.createdBy && c.createdBy !== myUid && c.createdBy !== b.ownerUid ? `<span class="ag-by">de ${esc(firstName(c.createdByName) || userName(c.createdBy))}</span>` : '';
   const avs = (c.assignees || []).slice(0, 3).map(u => avatarHtml(userName(u), u)).join('');
-  return `<article class="ag-card${c.done ? ' done' : ''}${late ? ' late' : ''}" tabindex="0" role="button" data-card="${attr(c.id)}"${can && mode === 'quadro' ? ' data-drag="1"' : ''} aria-label="Cartão ${attr(c.title)}">
+  return `<article class="ag-card${c.done ? ' done' : ''}${late ? ' late' : ''}" tabindex="0" role="button" data-card="${attr(c.id)}"${can && mode === 'quadro' ? ' data-drag="1"' : (can ? ' data-evdrag="1"' : '')} aria-label="Cartão ${attr(c.title)}">
     ${can ? `<button class="ag-check${c.done ? ' on' : ''}" data-ag-done="${attr(c.id)}" aria-pressed="${c.done ? 'true' : 'false'}" aria-label="${c.done ? 'Marcar como não concluído' : 'Marcar como concluído'}">${I.check}</button>`
           : `<span class="ag-check static${c.done ? ' on' : ''}" aria-hidden="true">${I.check}</span>`}
     <div class="ag-cbody"><div class="ag-ct">${esc(c.title)}</div>
@@ -1039,7 +1061,8 @@ function bindMain(main, b){
   main.querySelectorAll('[data-ag-pkclose]').forEach(el => el.onclick = () => { pickerOpen = false; mainSig = ''; renderMain(true); });
   main.querySelectorAll('[data-ag-pkmo]').forEach(el => el.onclick = () => { const d = new Date(pkY, pkM + +el.getAttribute('data-ag-pkmo'), 1); pkY = d.getFullYear(); pkM = d.getMonth(); mainSig = ''; renderMain(true); });
   main.querySelectorAll('[data-ag-pkday]').forEach(el => el.onclick = () => pickDay(+el.getAttribute('data-ag-pkday')));
-  main.querySelectorAll('[data-ag-day]').forEach(el => el.onclick = e => { if(e.target.closest('[data-card]') || Date.now() - lastDragEnd < 450) return; mode = 'dia'; savePref(); pickDay(+el.getAttribute('data-ag-day')); });
+  main.querySelectorAll('[data-ag-day]').forEach(el => el.onclick = e => { if(e.target.closest('[data-card]') || Date.now() - lastDragEnd < 450) return; const dd = +el.getAttribute('data-ag-day'); if(mobileLayout()){ selDay = dd; trayTab = 'dia'; mainSig = ''; renderMain(true); return; } mode = 'dia'; savePref(); pickDay(dd); });
+  main.querySelectorAll('[data-ag-tray]').forEach(el => el.onclick = () => { trayTab = el.getAttribute('data-ag-tray'); mainSig = ''; renderMain(true); });
   main.querySelectorAll('.ag-gcol').forEach(el => el.onclick = e => {
     if(e.target.closest('[data-card]') || Date.now() - lastDragEnd < 450) return;
     const b2 = curBoard(); if(!canAdd(b2)) return;
@@ -1063,14 +1086,14 @@ function bindMain(main, b){
   if(nl){ nl.onkeydown = e => { if(e.key === 'Enter'){ e.preventDefault(); submitList(); } else if(e.key === 'Escape'){ composing = null; mainSig = ''; renderMain(true); } }; if(!nl.value) nl.focus(); }
   main.querySelectorAll('[data-ag-listmenu]').forEach(el => el.onclick = () => listMenu(el, el.getAttribute('data-ag-listmenu')));
 
-  main.querySelectorAll('.ag-ev[data-card], .ag-gev[data-card], .ag-inb[data-card]').forEach(el => {
+  main.querySelectorAll('.ag-ev[data-card], .ag-gev[data-card], .ag-inb[data-card], .ag-card[data-evdrag]').forEach(el => {
     onActivate(el, () => { if(Date.now() - lastDragEnd < 450) return; openSheet({ kind: 'card', id: el.getAttribute('data-card') }); });
     if(canEditCard(b, cardById(el.getAttribute('data-card')))){
       el.addEventListener('touchstart', e => calDragStart(e, el), { passive: true });
       el.addEventListener('mousedown', e => calDragStart(e, el));
     }
   });
-  main.querySelectorAll('.ag-card').forEach(el => {
+  main.querySelectorAll('.ag-card:not([data-evdrag])').forEach(el => {
     onActivate(el, () => { if(Date.now() - lastDragEnd < 450) return; openSheet({ kind: 'card', id: el.getAttribute('data-card') }); });
     if(el.hasAttribute('data-drag')){
       el.addEventListener('touchstart', e => dragStart(e, el, 'touch'), { passive: true });
