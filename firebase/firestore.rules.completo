@@ -15,6 +15,7 @@ rules_version = '2';
 //  - Grupos e registro de atividade: só admin.
 //  - Almoxarifado (requisição de insumos) e setores: ver os blocos ao final.
 //  - Home: mural de comunicados (config/home e announcements) — todos leem; só admin e grupos liberados publicam.
+//  - Agendas (boards): dono/admin gerenciam; editor mexe em tudo; colaborador cria e edita só os seus cartões; leitor só lê (ver bloco "agendas" ao final).
 // =====================================================================
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -210,6 +211,67 @@ service cloud.firestore {
         (resource.data.criadoPor == request.auth.uid && resource.data.status == 'aberta'
          && request.resource.data.status == 'cancelada'));
       allow delete: if false;
+    }
+
+    // ---------- agendas (quadros estilo Trello) ----------
+    // boards/{id}: members = { uid: 'dono' | 'editor' | 'colab' | 'leitor' } e memberUids = [uid, ...] (sempre iguais).
+    //   dono e administrador: tudo, inclusive membros e exclusão da agenda
+    //   editor: listas e cartões de qualquer pessoa
+    //   colab (colaborador): cria cartões e altera/exclui só os que criou
+    //   leitor: só lê
+    // Mesma lógica de canManage / canEditAll / canAdd / canEditCard no agendas.js.
+    function bd(bid) {
+      return get(/databases/$(database)/documents/boards/$(bid)).data;
+    }
+    function bRole(b) {
+      return b.get('members', {}).get(request.auth.uid, '');
+    }
+    function bManage(b) { return isAdmin() || b.ownerUid == request.auth.uid; }
+    function bEdit(b)   { return bManage(b) || bRole(b) == 'editor'; }
+    function bAdd(b)    { return bEdit(b) || bRole(b) == 'colab'; }
+    function bRead(b)   { return isAdmin() || request.auth.uid in b.get('memberUids', []); }
+    function bValid(d) {
+      return d.name is string && d.name.size() > 0 && d.name.size() <= 40
+        && d.members is map && d.memberUids is list
+        && d.members.keys().toSet() == d.memberUids.toSet()
+        && d.members.values().toSet().difference(['dono', 'editor', 'colab', 'leitor'].toSet()).size() == 0
+        && d.members[d.ownerUid] == 'dono';
+    }
+
+    match /boards/{bid} {
+      allow read: if ok() && (isAdmin() || request.auth.uid in resource.data.get('memberUids', []));
+      allow create: if ok()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.memberUids == [request.auth.uid]
+        && bValid(request.resource.data);
+      allow update: if ok() && bManage(resource.data)
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && bValid(request.resource.data);
+      allow delete: if ok() && bManage(resource.data);
+
+      match /lists/{lid} {
+        allow read: if ok() && bRead(bd(bid));
+        allow write: if ok() && bEdit(bd(bid));
+      }
+
+      match /cards/{cid} {
+        allow read: if ok() && bRead(bd(bid));
+        allow create: if ok() && bAdd(bd(bid))
+          && request.resource.data.createdBy == request.auth.uid
+          && request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 300;
+        allow update: if ok() && (bEdit(bd(bid)) || (bRole(bd(bid)) == 'colab' && resource.data.createdBy == request.auth.uid))
+          && request.resource.data.createdBy == resource.data.createdBy;
+        allow delete: if ok() && (bEdit(bd(bid)) || (bRole(bd(bid)) == 'colab' && resource.data.createdBy == request.auth.uid));
+
+        match /comments/{mid} {
+          allow read: if ok() && bRead(bd(bid));
+          allow create: if ok() && bAdd(bd(bid))
+            && request.resource.data.authorUid == request.auth.uid
+            && request.resource.data.text is string && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 1000;
+          allow update: if false;
+          allow delete: if ok() && (resource.data.authorUid == request.auth.uid || bEdit(bd(bid)));
+        }
+      }
     }
 
     // ---------- registro de atividade ----------
