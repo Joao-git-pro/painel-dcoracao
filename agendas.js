@@ -49,8 +49,16 @@ let sheetBackPending = false;
 let confirmDelete = false;
 let fanOpen = false;
 let first = { b: true };
-let mode = 'quadro';              // quadro | dia | mes | agenda
-try{ const m = localStorage.getItem('agMode'); if(['quadro','dia','mes','agenda'].includes(m)) mode = m; }catch(e){}
+let mode = 'quadro';              // quadro | dia | semana | custom | mes | agenda | caixa
+let customN = 3, fit = false;
+try{
+  const m = localStorage.getItem('agMode'); if(['quadro','dia','semana','custom','mes','agenda','caixa'].includes(m)) mode = m;
+  const n = +localStorage.getItem('agCustomN'); if(n >= 2 && n <= 7) customN = n;
+  fit = localStorage.getItem('agFit') === '1';
+}catch(e){}
+function savePref(){ try{ localStorage.setItem('agMode', mode); localStorage.setItem('agCustomN', String(customN)); localStorage.setItem('agFit', fit ? '1' : '0'); }catch(e){} }
+let filter = { q: '', who: '', st: '' }, filterOpen = false;
+let cdrag = null;
 let selDay = sod(Date.now());     // dia em foco (visão Dia)
 let pickerOpen = false, pkY = new Date().getFullYear(), pkM = new Date().getMonth();
 let wk = weekStart(Date.now());   // segunda-feira (ms) da semana em exibição
@@ -90,7 +98,7 @@ function curBoard(){ return view ? boards.find(b => b.id === view.id) : null; }
 function bRef(id){ return db.collection('boards').doc(id || (view && view.id)); }
 function cardById(id){ return cards.find(c => c.id === id); }
 function listName(id){ const l = lists.find(x => x.id === id); return l ? l.name : ''; }
-function sortedCards(listId, all){ return cards.filter(c => c.listId === listId && (all || cardWeek(c) === wk)).sort((a, b) => (a.order || 0) - (b.order || 0)); }
+function sortedCards(listId, all){ return cards.filter(c => c.listId === listId && (all || (cardWeek(c) === wk && vis(c)))).sort((a, b) => (a.order || 0) - (b.order || 0)); }
 function toast(msg){ if(typeof showSnack === 'function') showSnack(msg); }
 function fail(err){ toast(errMsg(err)); }
 
@@ -103,16 +111,41 @@ function cardWeek(c){ return c.week || weekStart(tsMs(c.createdAt) || Date.now()
 function sod(ms){ const d = new Date(ms); d.setHours(0, 0, 0, 0); return d.getTime(); }
 const DIAS = ['domingo','segunda-feira','terça-feira','quarta-feira','quinta-feira','sexta-feira','sábado'];
 function dayTitle(ms){ const d = new Date(ms), t = `${DIAS[d.getDay()].replace('-feira', '')}, ${d.getDate()} de ${MESES[d.getMonth()]}`; return t.charAt(0).toUpperCase() + t.slice(1); }
+const cap = t => t.charAt(0).toUpperCase() + t.slice(1);
+const pad2 = n => String(n).padStart(2, '0');
+function isDayList(l){ return !!l && WDAYS[String(l.name).trim().toLowerCase()] !== undefined; }
+function dayListFor(day){ const dow = (new Date(day).getDay() + 6) % 7; return lists.find(l => WDAYS[String(l.name).trim().toLowerCase()] === dow); }
+function hasTime(c){ return !!c.due && !c.allDay; }
+function minsOf(ms){ const d = new Date(ms); return d.getHours() * 60 + d.getMinutes(); }
+function fmtT(ms){ const d = new Date(ms); return pad2(d.getHours()) + ':' + pad2(d.getMinutes()); }
 function cardDate(c){
-  const l = lists.find(x => x.id === c.listId); const i = l ? WDAYS[String(l.name).trim().toLowerCase()] : undefined;
-  if(i !== undefined) return addDays(cardWeek(c), i);
-  return c.due ? sod(c.due) : cardWeek(c);
+  if(c.due) return sod(c.due);
+  const l = lists.find(x => x.id === c.listId);
+  if(isDayList(l)) return addDays(cardWeek(c), WDAYS[String(l.name).trim().toLowerCase()]);
+  return cardWeek(c);
 }
-function cardsOnDay(d){ return cards.filter(c => cardDate(c) === d).sort((a, z) => (a.done - z.done) || ((a.due || a.order || 0) - (z.due || z.order || 0))); }
-function setMode(m){ mode = m; try{ localStorage.setItem('agMode', m); }catch(e){} pickerOpen = false; composing = null; mainSig = ''; renderMain(true); }
+function cardStartDay(c){ return c.start ? Math.min(sod(c.start), cardDate(c)) : cardDate(c); }
+function isInbox(c){ const l = lists.find(x => x.id === c.listId); return !c.due && !c.done && !isDayList(l) && !(l && /conclu/i.test(l.name)); }
+function vis(c){
+  if(filter.q && !(String(c.title) + ' ' + String(c.desc || '')).toLowerCase().includes(filter.q.toLowerCase())) return false;
+  if(filter.who && !(c.assignees || []).includes(filter.who)) return false;
+  if(filter.st === 'done' && !c.done) return false;
+  if(filter.st === 'open' && c.done) return false;
+  if(filter.st === 'late' && !(!c.done && c.due && c.due < Date.now())) return false;
+  return true;
+}
+function cardsOnDay(d){ return cards.filter(c => vis(c) && !isInbox(c) && cardStartDay(c) <= d && d <= cardDate(c)).sort((a, z) => (a.done - z.done) || ((hasTime(a) ? a.due : 0) - (hasTime(z) ? z.due : 0)) || ((a.order || 0) - (z.order || 0))); }
+function daysShown(){
+  if(mode === 'dia') return [selDay];
+  if(mode === 'semana'){ const w = weekStart(selDay); return [0, 1, 2, 3, 4, 5, 6].map(i => addDays(w, i)); }
+  return Array.from({ length: customN }, (_, i) => addDays(selDay, i));
+}
+function setMode(m){ mode = m; savePref(); pickerOpen = false; filterOpen = filterOpen; composing = null; mainSig = ''; renderMain(true); }
 function pickDay(d){ selDay = sod(d); pickerOpen = false; goWeek(weekStart(d)); }
 function stepPeriod(delta){
-  if(mode === 'dia'){ pickDay(addDays(selDay, delta)); return; }
+  if(mode === 'dia') { pickDay(addDays(selDay, delta)); return; }
+  if(mode === 'semana'){ pickDay(addDays(selDay, 7 * delta)); return; }
+  if(mode === 'custom'){ pickDay(addDays(selDay, customN * delta)); return; }
   goMonth(delta);
 }
 function curWeek(){ return weekStart(Date.now()); }
@@ -158,8 +191,8 @@ function dueInfo(c){
   const diff = Math.round((sod(d) - sod(now)) / 86400000);
   const hh = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   let label;
-  if(diff === 0) label = 'Hoje, ' + hh;
-  else if(diff === 1) label = 'Amanhã, ' + hh;
+  if(diff === 0) label = c.allDay ? 'Hoje' : 'Hoje, ' + hh;
+  else if(diff === 1) label = c.allDay ? 'Amanhã' : 'Amanhã, ' + hh;
   else label = d.toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' }).replace('.', '') + (d.getFullYear() !== now.getFullYear() ? ' ' + d.getFullYear() : '');
   let tone = '';
   if(c.done) tone = 'ok';
@@ -303,7 +336,7 @@ const CSS = `
 .ag-mc.sel{box-shadow:inset 0 0 0 2px var(--accent);}
 .ag-mc-n{align-self:flex-end; font-size:13px; font-weight:700; min-width:24px; height:24px; display:inline-flex; align-items:center; justify-content:center; border-radius:50%;}
 .ag-mc.today .ag-mc-n{background:var(--accent); color:var(--accent-ink);}
-.ag-ev{font-size:11.5px; font-weight:600; padding:2px 6px; border-radius:6px; background:var(--accent-soft); color:var(--accent-strong); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.ag-ev{font-size:11.5px; font-weight:600; padding:2px 6px; min-width:0; border-radius:6px; background:var(--accent-soft); color:var(--accent-strong); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 .ag-ev.done{opacity:.55; text-decoration:line-through;}
 .ag-ev.late{background:rgba(193,80,61,.14); color:var(--danger);}
 .ag-ev.more{background:transparent; color:var(--ink-soft);}
@@ -311,11 +344,81 @@ const CSS = `
 @media (max-width:768px), (pointer:coarse) and (max-height:520px){
   .ag-mc{min-height:56px; align-items:center; padding:4px 2px;}
   .ag-mc-n{align-self:center;}
-  .ag-ev{display:none;}
+  .ag-mc .ag-ev, .ag-mc .ag-more{display:none;}
   .ag-dotn{display:block;}
+  .ag-gh b{font-size:15px; min-width:28px; height:28px;}
   .ag-view{padding:12px 12px 24px;}
   .ag-pk{top:112px;}
 }
+
+.ag-bar{display:flex; align-items:center; gap:8px; margin-bottom:8px;}
+.ag-spacer{flex:1;}
+.ag-view-btn{display:inline-flex; align-items:center; gap:6px; padding:8px 12px; border-radius:11px; border:1px solid var(--line); background:var(--surface-2); color:var(--ink); font:inherit; font-size:14px; font-weight:800; cursor:pointer;}
+.ag-view-btn svg{width:15px; height:15px; color:var(--ink-soft);}
+.ag-view-btn:focus-visible{outline:2px solid var(--accent-strong); outline-offset:2px;}
+.ag-bar .head-btn.on{background:var(--accent-soft); color:var(--accent-strong);}
+.ag-bar .ag-btn svg{width:15px; height:15px;}
+.ag-filter{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px;}
+.ag-filter .ag-field{flex:1 1 180px; min-width:0;}
+.ag-filter .ag-select{flex:1 1 150px; min-width:0;}
+.ag-allday{display:flex; align-items:center; gap:8px; margin-top:8px; font-size:13.5px; font-weight:600; color:var(--ink-soft);}
+.ag-allday input{width:auto !important; accent-color:var(--accent);}
+.ag-opt{font-weight:500; color:var(--ink-soft); font-size:12px;}
+.ag-split{flex:1; min-height:0; display:flex;}
+.ag-split > .ag-view{flex:1; min-width:0;}
+.ag-side{display:none; width:300px; flex:none; overflow-y:auto; border-left:1px solid var(--line); background:var(--surface); padding:14px;}
+@media (min-width:1000px) and (pointer:fine){ .ag-side{display:block;} }
+.ag-side-cal .ag-pk-d{font-size:13px;}
+.ag-pk-d.rng{background:var(--accent-soft); border-radius:8px;}
+.ag-inbox{margin-top:16px; border:1px dashed var(--line); border-radius:14px; padding:10px; transition:background .12s, border-color .12s;}
+.ag-inbox.drop{background:var(--accent-soft); border-color:var(--accent);}
+.ag-inbox.full{margin:0 auto; max-width:560px; background:var(--surface-2); border-style:solid;}
+.ag-inb-h{display:flex; align-items:center; justify-content:space-between;}
+.ag-inb-h h3{margin:0; font-size:15px; font-weight:800;}
+.ag-inb-hint{font-size:12.5px; color:var(--ink-soft); margin:2px 0 8px;}
+.ag-inb-add{display:flex; gap:6px; margin-bottom:8px;}
+.ag-inb-add .ag-field{flex:1; min-width:0;}
+.ag-inb-l{display:flex; flex-direction:column; gap:6px;}
+.ag-inb{padding:9px 11px; border-radius:10px; background:var(--surface); border:1px solid var(--line); font-size:14px; font-weight:600; cursor:grab; box-shadow:0 1px 2px rgba(0,0,0,.06);}
+.ag-inb:focus-visible, .ag-ev:focus-visible, .ag-gev:focus-visible{outline:2px solid var(--accent-strong); outline-offset:1px;}
+.ag-view.grid{padding:0; display:flex; flex-direction:column; overflow:hidden;}
+.ag-gscroll{flex:1; min-height:0; overflow:auto; position:relative; --hh:54px;}
+.ag-ghead, .ag-gall{display:grid; grid-template-columns:52px repeat(var(--cols), minmax(var(--cw), 1fr)); position:sticky; background:var(--surface); z-index:4;}
+.ag-ghead{top:0; height:62px; border-bottom:1px solid var(--line);}
+.ag-gall{top:62px; border-bottom:1px solid var(--line); z-index:3;}
+.ag-gcorner{display:flex; align-items:center; justify-content:center; font-size:10.5px; color:var(--ink-soft); font-weight:700; text-align:center; line-height:1.1;}
+.ag-gh{display:flex; flex-direction:column; align-items:center; padding:8px 0 6px; border-left:1px solid var(--line); gap:2px;}
+.ag-gh span{font-size:12px; font-weight:700; text-transform:uppercase; color:var(--ink-soft);}
+.ag-gh b{font-size:17px; font-weight:800; min-width:32px; height:32px; display:inline-flex; align-items:center; justify-content:center; border-radius:50%;}
+.ag-gh.today span{color:var(--accent-strong);}
+.ag-gh.today b{background:var(--accent); color:var(--accent-ink);}
+.ag-gad{border-left:1px solid var(--line); padding:4px; display:flex; flex-direction:column; gap:3px; min-height:34px; position:relative; transition:background .12s;}
+.ag-gadd{align-self:flex-start; border:0; background:transparent; color:var(--ink-soft); cursor:pointer; padding:2px; border-radius:6px; opacity:.6;}
+.ag-gadd:hover{opacity:1; background:var(--surface-2);}
+.ag-gadd svg{width:14px; height:14px;}
+.ag-grid{display:grid; grid-template-columns:52px repeat(var(--cols), minmax(var(--cw), 1fr)); height:calc(var(--n) * var(--hh));}
+.ag-gscroll.fit .ag-grid{height:100%; min-height:calc(var(--n) * 22px);}
+.ag-gutter{display:flex; flex-direction:column; position:sticky; left:0; background:var(--surface); z-index:2;}
+.ag-hr{flex:1; position:relative; min-height:0;}
+.ag-hr span{position:absolute; top:-8px; right:6px; font-size:11px; color:var(--ink-soft); font-weight:600;}
+.ag-gcol{position:relative; border-left:1px solid var(--line); background-image:repeating-linear-gradient(to bottom, transparent 0, transparent calc(100% / var(--n) - 1px), var(--line) calc(100% / var(--n) - 1px), var(--line) calc(100% / var(--n))); cursor:cell; transition:background-color .12s;}
+.ag-gcol.today{background-color:var(--accent-soft);}
+.ag-gcol.drop, .ag-gad.drop, .ag-mc.drop, .ag-ag-day.drop{background-color:var(--accent-soft); box-shadow:inset 0 0 0 2px var(--accent);}
+.ag-gev{position:absolute; box-sizing:border-box; padding:3px 6px; border-radius:7px; background:var(--accent); color:var(--accent-ink); font-size:12px; font-weight:600; overflow:hidden; cursor:grab; line-height:1.25; box-shadow:0 1px 3px rgba(0,0,0,.2);}
+.ag-gev b{font-weight:800;}
+.ag-gev.done{opacity:.55; text-decoration:line-through;}
+.ag-gev.late{background:var(--danger); color:#fff;}
+.ag-now{position:absolute; left:0; right:0; height:0; border-top:2px solid var(--danger); z-index:2; pointer-events:none;}
+.ag-now::before{content:''; position:absolute; left:-4px; top:-5px; width:8px; height:8px; border-radius:50%; background:var(--danger);}
+.ag-cghost{position:fixed !important; z-index:9999; pointer-events:none; box-shadow:0 14px 30px rgba(0,0,0,.35); opacity:.96; border-radius:10px; margin:0; max-width:240px; overflow:hidden; white-space:normal;}
+.ghosted{opacity:.35;}
+body.ag-dragging{user-select:none; -webkit-user-select:none; cursor:grabbing;}
+.ag-ev{cursor:grab;}
+.ag-ev b{font-weight:800;}
+.ag-ev.span{border-radius:2px 6px 6px 2px; background:var(--accent-soft); opacity:.85;}
+.ag-ev.span::before{content:'↔ ';}
+.ag-more{font-size:11.5px; color:var(--ink-soft); font-weight:700; padding-left:4px;}
+.ag-ag-day{transition:background-color .12s; border-radius:12px;}
 
 /* quadro */
 .ag-wrap{position:relative; flex:1; min-height:0; display:flex; flex-direction:column;}
@@ -566,7 +669,7 @@ function renderMain(force){
   const main = byId('mainPane'); if(!main) return;
   const b = curBoard();
   if(!view || !b){ mainSig = ''; if(typeof renderEmptyMain === 'function') renderEmptyMain(); return; }
-  const sig = JSON.stringify([b, lists, cards, sheet, comments, composing, confirmDelete, wk, moY, moM, mode, selDay, pickerOpen, pkY, pkM, Math.floor(Date.now() / 3600000), isAdmin, allUsers.length, myChatName]);
+  const sig = JSON.stringify([b, lists, cards, sheet, comments, composing, confirmDelete, wk, moY, moM, mode, selDay, pickerOpen, pkY, pkM, customN, fit, filter, filterOpen, Math.floor(Date.now() / 3600000), isAdmin, allUsers.length, myChatName]);
   if(!force && sig === mainSig) return;
   mainSig = sig;
   mainKey = 'ag:' + b.id;
@@ -577,11 +680,12 @@ function renderMain(force){
   const keepY = {};
   main.querySelectorAll('.ag-cards').forEach(el => { keepY[el.getAttribute('data-list')] = el.scrollTop; });
   const viewEl = main.querySelector('.ag-view'); const keepViewY = viewEl ? viewEl.scrollTop : 0;
+  const gEl = main.querySelector('.ag-gscroll'); const keepG = gEl ? [gEl.scrollTop, gEl.scrollLeft] : null;
   const sheetBody = main.querySelector('.ag-sh-body');
   const keepSheetY = sheetBody ? sheetBody.scrollTop : 0;
   // título e descrição só são preservados enquanto a pessoa está digitando neles
   const typing = document.activeElement && ['agDesc', 'agTitle'].includes(document.activeElement.id) ? [document.activeElement.id] : [];
-  const st = captureInputs(['agCompose', 'agNewList', 'agCmIn', 'agChkIn'].concat(typing));
+  const st = captureInputs(['agCompose', 'agNewList', 'agCmIn', 'agChkIn', 'agQ', 'agInbIn'].concat(typing));
 
   const can = canEditAll(b);
   const note = myPermNote(b);
@@ -596,7 +700,7 @@ function renderMain(force){
     </div>
     <div class="ag-wrap">
       ${note ? `<div class="ag-note">${canAdd(b) ? I.check : lockSvg}${esc(note)}</div>` : ''}
-      ${periodHtml()}
+      ${periodHtml(b)}
       <div class="pane-body wallpaper" style="display:flex; flex-direction:column; overflow:hidden;">
         ${mode === 'quadro' ? boardHtml(b, can) : viewHtml(b)}
         ${mode === 'quadro' ? `<div class="ag-dots" id="agDots" aria-hidden="true">${lists.map((l, i) => `<i${i === 0 ? ' class="on"' : ''}></i>`).join('')}</div>` : ''}
@@ -610,92 +714,151 @@ function renderMain(force){
   main.querySelectorAll('.ag-cards').forEach(el => { const y = keepY[el.getAttribute('data-list')]; if(y) el.scrollTop = y; });
   const sb = main.querySelector('.ag-sh-body'); if(sb) sb.scrollTop = keepSheetY;
   const nv = main.querySelector('.ag-view'); if(nv) nv.scrollTop = keepViewY;
+  const ng = main.querySelector('.ag-gscroll'); if(ng){ if(keepG){ ng.scrollTop = keepG[0]; ng.scrollLeft = keepG[1]; } else if(!fit) ng.scrollTop = 54; }
   updateDots();
   if(typeof applyShell === 'function') applyShell();
 }
 
-function periodHtml(){
-  const c = curWeek(), ws = weeksOfMonth(moY, moM);
+const MODES = [['quadro', 'Quadro'], ['dia', 'Dia'], ['semana', 'Semana'], ['custom', 'Personalizar'], ['mes', 'Mês'], ['agenda', 'Agenda'], ['caixa', 'Caixa de entrada']];
+function modeLabel(){ const m = MODES.find(x => x[0] === mode); return mode === 'custom' ? customN + ' dias' : (m ? m[1] : ''); }
+function rangeTitle(){
+  const ab = x => new Date(x).toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
+  const d = daysShown(), f = d[0], l = d[d.length - 1];
+  return new Date(f).getMonth() === new Date(l).getMonth() ? `${new Date(f).getDate()}–${new Date(l).getDate()} ${ab(l)} ${new Date(l).getFullYear()}` : `${new Date(f).getDate()} ${ab(f)} – ${new Date(l).getDate()} ${ab(l)}`;
+}
+function periodHtml(b){
+  const c = curWeek(), ws = weeksOfMonth(moY, moM), today = sod(Date.now());
   const chips = mode !== 'quadro' ? '' : `<div class="ag-wks">${ws.map(w => {
     const n = cards.filter(x => cardWeek(x) === w).length;
     const tag = w === c ? 'Esta semana' : (w === addDays(c, 7) ? 'Próxima' : '');
     return `<button class="ag-wk${w === wk ? ' on' : ''}${w < c ? ' past' : ''}" data-ag-wk="${w}" aria-pressed="${w === wk ? 'true' : 'false'}"><b>${esc(weekLabel(w))}</b><span>${tag ? esc(tag) : (n ? n + ' cartão' + (n === 1 ? '' : 's') : '&nbsp;')}</span></button>`;
   }).join('')}</div>`;
-  const today = sod(Date.now());
-  const isNow = mode === 'dia' ? selDay === today : (moY === new Date().getFullYear() && moM === new Date().getMonth() && (mode !== 'quadro' || wk === c));
-  const title = mode === 'dia' ? `<span class="ag-mo-d">${esc(dayTitle(selDay))}</span>` : `${MESES[moM]} <i>${moY}</i>`;
-  const tabs = [['quadro', 'Quadro'], ['dia', 'Dia'], ['mes', 'Mês'], ['agenda', 'Agenda']].map(([k, l]) => `<button role="tab" class="ag-tab${mode === k ? ' on' : ''}" data-ag-mode="${k}" aria-selected="${mode === k}">${l}</button>`).join('');
-  return `<div class="ag-period" role="group" aria-label="Período">
-    <div class="ag-tabs" role="tablist" aria-label="Modo de exibição">${tabs}</div>
-    <div class="ag-mo"><button class="head-btn sm" data-ag-step="-1" aria-label="Anterior">${I.left}</button>
+  const dayBased = ['dia', 'semana', 'custom'].includes(mode);
+  const isNow = dayBased ? daysShown().includes(today) && (mode !== 'dia' || selDay === today) : (moY === new Date().getFullYear() && moM === new Date().getMonth() && (mode !== 'quadro' || wk === c));
+  const title = mode === 'dia' ? esc(dayTitle(selDay)) : (mode === 'semana' || mode === 'custom') ? esc(rangeTitle()) : `${cap(MESES[moM])} <i>${moY}</i>`;
+  const nav = mode === 'caixa' ? '' : `<div class="ag-mo"><button class="head-btn sm" data-ag-step="-1" aria-label="Anterior">${I.left}</button>
       <button class="ag-mo-t" data-ag-picker aria-haspopup="dialog" aria-expanded="${pickerOpen}">${title}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
       <button class="head-btn sm" data-ag-step="1" aria-label="Próximo">${I.right}</button>
-      <button class="ag-btn sm" data-ag-mo="0"${isNow ? ' disabled' : ''}>Hoje</button></div>
-    ${chips}${pickerOpen ? pickerHtml() : ''}</div>`;
+      <button class="ag-btn sm" data-ag-mo="0"${isNow ? ' disabled' : ''}>Hoje</button></div>`;
+  const active = !!(filter.q || filter.who || filter.st);
+  const filt = filterOpen ? `<div class="ag-filter">
+      <input id="agQ" class="ag-field" type="search" placeholder="Buscar cartão…" value="${attr(filter.q)}" aria-label="Buscar cartão">
+      <select class="ag-select" id="agFWho" aria-label="Responsável"><option value="">Todos os responsáveis</option>${(b.memberUids || []).map(u => `<option value="${attr(u)}"${filter.who === u ? ' selected' : ''}>${esc(userName(u))}</option>`).join('')}</select>
+      <select class="ag-select" id="agFSt" aria-label="Situação">${[['', 'Todas as situações'], ['open', 'Pendentes'], ['late', 'Atrasados'], ['done', 'Concluídos']].map(([v, l]) => `<option value="${v}"${filter.st === v ? ' selected' : ''}>${l}</option>`).join('')}</select>
+      ${active ? `<button class="ag-btn sm" id="agFClear">Limpar</button>` : ''}</div>` : '';
+  return `<div class="ag-period" role="group" aria-label="Período">
+    <div class="ag-bar"><button class="ag-view-btn" data-ag-viewmenu aria-haspopup="menu">${esc(modeLabel())}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
+      <span class="ag-spacer"></span>
+      <button class="head-btn${active ? ' on' : ''}" data-ag-filter aria-label="Buscar e filtrar" aria-pressed="${filterOpen}" title="Buscar e filtrar">${searchIconSvg}</button>
+      ${canAdd(b) ? `<button class="ag-btn pri sm" data-ag-create>${plusSvg}Criar</button>` : ''}</div>
+    ${filt}${nav}${chips}${pickerOpen ? `<div class="ag-pk-bg" data-ag-pkclose></div><div class="ag-pk" role="dialog" aria-label="Escolher data">${miniCal()}</div>` : ''}</div>`;
 }
 
-function pickerHtml(){
+function miniCal(){
   const first = new Date(pkY, pkM, 1), start = weekStart(first.getTime()), today = sod(Date.now());
-  const has = new Set(cards.map(cardDate));
+  const has = new Set(cards.filter(c => vis(c) && !isInbox(c)).map(cardDate));
+  const inRange = mode === 'quadro' ? null : new Set(mode === 'mes' || mode === 'agenda' ? [] : daysShown());
   let cells = '';
   for(let i = 0; i < 42; i++){
     const d = addDays(start, i), dt = new Date(d), out = dt.getMonth() !== pkM;
     if(i % 7 === 0 && i >= 35 && out) break;
-    cells += `<button class="ag-pk-d${out ? ' out' : ''}${d === today ? ' today' : ''}${d === selDay ? ' sel' : ''}${has.has(d) ? ' has' : ''}" data-ag-pkday="${d}" aria-label="${esc(dayTitle(d))}">${dt.getDate()}</button>`;
+    cells += `<button class="ag-pk-d${out ? ' out' : ''}${d === today ? ' today' : ''}${d === selDay ? ' sel' : ''}${inRange && inRange.has(d) && d !== selDay ? ' rng' : ''}${has.has(d) ? ' has' : ''}" data-ag-pkday="${d}" aria-label="${esc(dayTitle(d))}">${dt.getDate()}</button>`;
   }
-  return `<div class="ag-pk-bg" data-ag-pkclose></div><div class="ag-pk" role="dialog" aria-label="Escolher data">
-    <div class="ag-pk-h"><button class="head-btn sm" data-ag-pkmo="-1" aria-label="Mês anterior">${I.left}</button><b>${MESES[pkM]} ${pkY}</b><button class="head-btn sm" data-ag-pkmo="1" aria-label="Próximo mês">${I.right}</button></div>
-    <div class="ag-pk-w">${['seg','ter','qua','qui','sex','sáb','dom'].map(x => `<i>${x}</i>`).join('')}</div>
+  return `<div class="ag-pk-h"><button class="head-btn sm" data-ag-pkmo="-1" aria-label="Mês anterior">${I.left}</button><b>${cap(MESES[pkM])} ${pkY}</b><button class="head-btn sm" data-ag-pkmo="1" aria-label="Próximo mês">${I.right}</button></div>
+    <div class="ag-pk-w">${['seg', 'ter', 'qua', 'qui', 'sex', 'sáb', 'dom'].map(x => `<i>${x}</i>`).join('')}</div>
     <div class="ag-pk-g">${cells}</div>
-    <button class="ag-btn sm" data-ag-pkday="${today}" style="margin-top:8px; width:100%">Ir para hoje</button></div>`;
+    <button class="ag-btn sm" data-ag-pkday="${today}" style="margin-top:8px; width:100%">Ir para hoje</button>`;
 }
 
-// ---------- visões Dia, Mês e Agenda ----------
+// ---------- visões de calendário ----------
 function viewHtml(b){
-  let inner = '';
-  if(mode === 'dia') inner = diaHtml(b);
-  else if(mode === 'mes') inner = mesHtml();
-  else inner = agendaHtml(b);
-  return `<div class="ag-view" id="agView">${inner}</div>`;
+  if(mode === 'caixa') return `<div class="ag-view">${inboxHtml(b, true)}</div>`;
+  const side = `<aside class="ag-side" aria-label="Calendário e caixa de entrada"><div class="ag-side-cal" id="agSideCal">${miniCal()}</div>${inboxHtml(b, false)}</aside>`;
+  let core;
+  if(mode === 'mes') core = `<div class="ag-view">${mesHtml()}</div>`;
+  else if(mode === 'agenda') core = `<div class="ag-view">${agendaHtml(b)}</div>`;
+  else core = gridHtml(b);
+  return `<div class="ag-split">${core}${side}</div>`;
 }
-function miniCard(b, c){
-  const l = lists.find(x => x.id === c.listId);
-  const tag = l && WDAYS[String(l.name).trim().toLowerCase()] === undefined ? `<span class="ag-chip">${esc(l.name)}</span>` : '';
-  return cardHtml(b, c, tag);
-}
-function diaHtml(b){
-  const list = cardsOnDay(selDay);
-  const open = canAdd(b) && weekOpen(weekStart(selDay));
-  const foot = composing === '__day'
-    ? `<div class="ag-compose"><textarea id="agCompose" rows="2" maxlength="300" placeholder="Título do cartão" aria-label="Título do novo cartão"></textarea><div class="ag-compose-act"><button class="ag-btn pri sm" data-ag-addcard="__day">Adicionar cartão</button><button class="ag-btn sm" data-ag-cancelcompose aria-label="Cancelar">${xSvg}</button></div></div>`
-    : (open ? `<button class="ag-add" data-ag-compose="__day">${plusSvg}Adicionar cartão</button>`
-      : `<div class="ag-add lock">${lockSvg}${!canAdd(b) ? 'Somente leitura' : (weekStart(selDay) < curWeek() ? 'Semana encerrada' : 'Ainda não liberada')}</div>`);
-  return `<div class="ag-day-card"><div class="ag-day-h"><h3>${list.length ? list.length + (list.length === 1 ? ' cartão' : ' cartões') : 'Livre'}</h3>${selDay === sod(Date.now()) ? '<span class="ag-count">Hoje</span>' : ''}</div>
-    <div class="ag-day-l">${list.length ? list.map(c => miniCard(b, c)).join('') : '<div class="ag-nothing">Nada planejado para este dia.</div>'}</div>
-    <div class="ag-foot">${foot}</div></div>`;
+function evChip(c, extra){
+  const late = !c.done && c.due && c.due < Date.now();
+  return `<div class="ag-ev${c.done ? ' done' : ''}${late ? ' late' : ''}${extra || ''}" tabindex="0" role="button" data-card="${attr(c.id)}" data-evdrag="1" title="${attr(c.title)}">${hasTime(c) ? `<b>${fmtT(c.due)}</b> ` : ''}${esc(c.title)}</div>`;
 }
 function mesHtml(){
   const start = weekStart(new Date(moY, moM, 1).getTime()), today = sod(Date.now());
-  const heads = ['seg','ter','qua','qui','sex','sáb','dom'].map(x => `<i>${x}</i>`).join('');
+  const heads = ['seg', 'ter', 'qua', 'qui', 'sex', 'sáb', 'dom'].map(x => `<i>${x}</i>`).join('');
   let cells = '';
   for(let i = 0; i < 42; i++){
     const d = addDays(start, i), dt = new Date(d), out = dt.getMonth() !== moM;
     if(i % 7 === 0 && i >= 35 && out) break;
     const cs = cardsOnDay(d), shown = cs.slice(0, 3);
-    cells += `<button class="ag-mc${out ? ' out' : ''}${d === today ? ' today' : ''}${d === selDay ? ' sel' : ''}" data-ag-day="${d}" aria-label="${esc(dayTitle(d))}, ${cs.length} cartão(ões)">
+    cells += `<div class="ag-mc${out ? ' out' : ''}${d === today ? ' today' : ''}${d === selDay ? ' sel' : ''}" role="button" tabindex="0" data-ag-day="${d}" data-drop-day="${d}" aria-label="${esc(dayTitle(d))}, ${cs.length} cartão(ões)">
       <span class="ag-mc-n">${dt.getDate()}</span>
-      ${shown.map(c => `<span class="ag-ev${c.done ? ' done' : ''}${!c.done && c.due && c.due < Date.now() ? ' late' : ''}">${esc(c.title)}</span>`).join('')}
-      ${cs.length > 3 ? `<span class="ag-ev more">+${cs.length - 3}</span>` : ''}
-      ${cs.length ? `<span class="ag-dotn">${cs.length > 3 ? '3+' : '•'.repeat(cs.length)}</span>` : ''}</button>`;
+      ${shown.map(c => evChip(c, cardStartDay(c) < cardDate(c) ? ' span' : '')).join('')}
+      ${cs.length > 3 ? `<span class="ag-more">+${cs.length - 3}</span>` : ''}
+      ${cs.length ? `<span class="ag-dotn">${cs.length > 3 ? '3+' : '•'.repeat(cs.length)}</span>` : ''}</div>`;
   }
   return `<div class="ag-mgrid"><div class="ag-mh">${heads}</div><div class="ag-mb">${cells}</div></div>`;
 }
 function agendaHtml(b){
   const days = [], last = new Date(moY, moM + 1, 0).getDate();
   for(let i = 1; i <= last; i++){ const d = new Date(moY, moM, i).getTime(); const cs = cardsOnDay(d); if(cs.length) days.push([d, cs]); }
-  if(!days.length) return `<div class="ag-empty-board" style="margin:40px auto"><b>Nada planejado em ${MESES[moM]}</b>Use o modo Quadro ou Dia para incluir cartões na semana atual ou na próxima.</div>`;
+  if(!days.length) return `<div class="ag-empty-board" style="margin:40px auto"><b>Nada planejado em ${MESES[moM]}</b>Use Quadro, Dia ou Semana para incluir cartões na semana atual ou na próxima.</div>`;
   const today = sod(Date.now());
-  return days.map(([d, cs]) => `<section class="ag-ag-day"><h3${d === today ? ' class="today"' : ''}>${esc(dayTitle(d))}${d === today ? '<em>Hoje</em>' : ''}</h3>${cs.map(c => miniCard(b, c)).join('')}</section>`).join('');
+  return days.map(([d, cs]) => `<section class="ag-ag-day" data-drop-day="${d}"><h3${d === today ? ' class="today"' : ''}>${esc(dayTitle(d))}${d === today ? '<em>Hoje</em>' : ''}</h3>${cs.map(c => miniCard(b, c)).join('')}</section>`).join('');
+}
+function miniCard(b, c){
+  const l = lists.find(x => x.id === c.listId);
+  const tag = l && !isDayList(l) ? `<span class="ag-chip">${esc(l.name)}</span>` : '';
+  return cardHtml(b, c, tag);
+}
+function gridHtml(b){
+  const days = daysShown(), today = sod(Date.now());
+  let h0 = 6, h1 = 22;
+  days.forEach(d => cardsOnDay(d).forEach(c => { if(hasTime(c) && cardDate(c) === d){ const h = Math.floor(minsOf(c.due) / 60); h0 = Math.min(h0, h); h1 = Math.max(h1, h + 2); } }));
+  h1 = Math.min(h1, 24);
+  const n = h1 - h0, canNew = canAdd(b);
+  const head = days.map(d => {
+    const dt = new Date(d);
+    return `<div class="ag-gh${d === today ? ' today' : ''}"><span>${['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'][dt.getDay()]}</span><b>${dt.getDate()}</b></div>`;
+  }).join('');
+  const allday = days.map(d => {
+    const cs = cardsOnDay(d).filter(c => !(hasTime(c) && cardDate(c) === d));
+    const open = canNew && weekOpen(weekStart(d));
+    return `<div class="ag-gad" data-drop-day="${d}">${cs.map(c => evChip(c, cardStartDay(c) < cardDate(c) ? ' span' : '')).join('')}${open ? `<button class="ag-gadd" data-ag-create="${d}" aria-label="Incluir cartão em ${esc(dayTitle(d))}">${plusSvg}</button>` : ''}</div>`;
+  }).join('');
+  const gutter = Array.from({ length: n }, (_, i) => `<div class="ag-hr"><span>${pad2(h0 + i)}:00</span></div>`).join('');
+  const nowM = minsOf(Date.now());
+  const cols = days.map(d => {
+    const evs = cardsOnDay(d).filter(c => hasTime(c) && cardDate(c) === d).sort((a, z) => a.due - z.due);
+    const laneEnd = []; const placed = evs.map(c => {
+      const st = minsOf(c.due); let lane = laneEnd.findIndex(e => e <= st); if(lane < 0){ lane = laneEnd.length; laneEnd.push(0); }
+      laneEnd[lane] = st + 50; return { c, st, lane };
+    });
+    // largura por grupo de sobreposição
+    placed.forEach(p => { p.lanes = placed.filter(q => q.st < p.st + 50 && p.st < q.st + 50).reduce((m, q) => Math.max(m, q.lane + 1), p.lane + 1); });
+    const html = placed.map(({ c, st, lane, lanes }) => {
+      const top = (st - h0 * 60) / (n * 60) * 100, hgt = 50 / (n * 60) * 100;
+      const late = !c.done && c.due < Date.now();
+      return `<div class="ag-gev${c.done ? ' done' : ''}${late ? ' late' : ''}" style="top:${top}%; height:${hgt}%; left:calc(${lane} * 100% / ${lanes}); width:calc(100% / ${lanes} - 3px)" tabindex="0" role="button" data-card="${attr(c.id)}" data-evdrag="1" title="${attr(c.title)}"><b>${fmtT(c.due)}</b> ${esc(c.title)}</div>`;
+    }).join('');
+    const now = d === today && nowM >= h0 * 60 && nowM <= h1 * 60 ? `<i class="ag-now" style="top:${(nowM - h0 * 60) / (n * 60) * 100}%"></i>` : '';
+    return `<div class="ag-gcol${d === today ? ' today' : ''}" data-day="${d}" data-drop-day="${d}" data-h0="${h0}" data-n="${n}">${html}${now}</div>`;
+  }).join('');
+  const cw = days.length === 1 ? 240 : (days.length <= 3 ? 150 : (days.length <= 5 ? 112 : 96));
+  return `<div class="ag-view grid"><div class="ag-gscroll${fit ? ' fit' : ''}" style="--cols:${days.length}; --cw:${cw}px; --n:${n}">
+    <div class="ag-ghead"><div class="ag-gcorner"></div>${head}</div>
+    <div class="ag-gall"><div class="ag-gcorner"><span>dia todo</span></div>${allday}</div>
+    <div class="ag-grid"><div class="ag-gutter">${gutter}</div>${cols}</div></div></div>`;
+}
+function inboxHtml(b, full){
+  const list = cards.filter(c => vis(c) && isInbox(c)).sort((a, z) => (a.order || 0) - (z.order || 0));
+  const canNew = canAdd(b);
+  return `<section class="ag-inbox${full ? ' full' : ''}" data-drop-inbox="1" aria-label="Caixa de entrada">
+    <div class="ag-inb-h"><h3>Caixa de entrada</h3><span class="ag-count">${list.length}</span></div>
+    <div class="ag-inb-hint">Cartões sem data. ${full ? 'Toque para abrir e definir a data.' : 'Arraste para o calendário para agendar.'}</div>
+    ${canNew ? `<div class="ag-inb-add"><input id="agInbIn" class="ag-field" maxlength="300" placeholder="Adicionar um cartão" aria-label="Novo cartão na caixa de entrada"><button class="ag-btn pri sm" id="agInbBtn" aria-label="Adicionar">${plusSvg}</button></div>` : ''}
+    <div class="ag-inb-l">${list.length ? list.map(c => `<div class="ag-inb${c.done ? ' done' : ''}" tabindex="0" role="button" data-card="${attr(c.id)}" data-evdrag="1">${esc(c.title)}</div>`).join('') : '<div class="ag-nothing">Nada por aqui. Cartões sem data aparecem nesta caixa.</div>'}</div></section>`;
 }
 
 function boardHtml(b, can){
@@ -787,8 +950,12 @@ function cardSheetHtml(b, c){
         <select class="ag-select" id="agMove" aria-label="Mover para a lista"${can ? '' : ' disabled'}>${lists.map(l => `<option value="${attr(l.id)}"${l.id === c.listId ? ' selected' : ''}>${esc(l.name)}</option>`).join('')}</select></div>
 
       <div class="ag-block"><div class="ag-lbl">${I.cal}Entrega</div>
-        <div class="ag-roww"><input class="ag-field" type="datetime-local" id="agDue" value="${attr(toLocalInput(c.due))}" aria-label="Data e hora de entrega"${can ? '' : ' disabled'}>
-          ${can && c.due ? `<button class="ag-btn sm" id="agDueClear">Limpar</button>` : ''}</div></div>
+        <div class="ag-roww"><input class="ag-field" type="${c.allDay ? 'date' : 'datetime-local'}" id="agDue" value="${attr(c.allDay ? toLocalInput(c.due).slice(0, 10) : toLocalInput(c.due))}" aria-label="Data e hora de entrega"${can ? '' : ' disabled'}>
+          ${can && c.due ? `<button class="ag-btn sm" id="agDueClear">Limpar</button>` : ''}</div>
+        ${can ? `<label class="ag-allday"><input type="checkbox" id="agAllDay"${c.allDay ? ' checked' : ''}> Dia inteiro (sem horário)</label>` : (c.allDay ? '<div class="ag-hint">Dia inteiro</div>' : '')}</div>
+      <div class="ag-block"><div class="ag-lbl">${I.cal}Início <span class="ag-opt">(opcional, para tarefas de vários dias)</span></div>
+        <div class="ag-roww"><input class="ag-field" type="date" id="agStart" value="${attr(c.start ? toLocalInput(c.start).slice(0, 10) : '')}" aria-label="Data de início"${can ? '' : ' disabled'}>
+          ${can && c.start ? `<button class="ag-btn sm" id="agStartClear">Limpar</button>` : ''}</div></div>
 
       <div class="ag-block"><div class="ag-lbl">${usersSvg}Responsáveis</div>
         <div class="ag-ppl">${people.length ? people.map(u => `<button class="ag-p${(c.assignees || []).includes(u) ? ' on' : ''}" data-ag-assign="${attr(u)}" aria-pressed="${(c.assignees || []).includes(u) ? 'true' : 'false'}"${can ? '' : ' disabled'}>${avatarHtml(userName(u), u)}${esc(firstName(userName(u)))}</button>`).join('') : '<span class="ag-hint">Convide pessoas para a agenda para atribuir cartões.</span>'}</div></div>
@@ -858,13 +1025,30 @@ function bindMain(main, b){
 
   main.querySelectorAll('[data-ag-mo]').forEach(el => el.onclick = () => goMonth(+el.getAttribute('data-ag-mo')));
   main.querySelectorAll('[data-ag-step]').forEach(el => el.onclick = () => stepPeriod(+el.getAttribute('data-ag-step')));
-  main.querySelectorAll('[data-ag-mode]').forEach(el => el.onclick = () => setMode(el.getAttribute('data-ag-mode')));
-  q('[data-ag-picker]', el => el.onclick = () => { pickerOpen = !pickerOpen; pkY = moY; pkM = moM; if(mode === 'dia'){ const d = new Date(selDay); pkY = d.getFullYear(); pkM = d.getMonth(); } mainSig = ''; renderMain(true); });
+  q('[data-ag-viewmenu]', el => el.onclick = () => openMenu(el, MODES.map(([k, l]) => ({
+    label: k === 'custom' ? 'Personalizar…' : l, icon: mode === k ? I.check : '',
+    action: () => { if(k === 'custom') customModal(); else setMode(k); }
+  })).concat([['dia', 'semana', 'custom'].includes(mode) ? { label: fit ? 'Altura fixa das horas' : 'Ajustar ao tamanho da tela', icon: fit ? I.check : '', action: () => { fit = !fit; savePref(); mainSig = ''; renderMain(true); } } : null])));
+  q('[data-ag-filter]', el => el.onclick = () => { filterOpen = !filterOpen; mainSig = ''; renderMain(true); const t = byId('agQ'); if(t) t.focus(); });
+  q('#agQ', el => { let tm; el.oninput = () => { clearTimeout(tm); tm = setTimeout(() => { filter.q = el.value.trim(); mainSig = ''; renderMain(true); }, 220); }; });
+  q('#agFWho', el => el.onchange = () => { filter.who = el.value; mainSig = ''; renderMain(true); });
+  q('#agFSt', el => el.onchange = () => { filter.st = el.value; mainSig = ''; renderMain(true); });
+  q('#agFClear', el => el.onclick = () => { filter = { q: '', who: '', st: '' }; mainSig = ''; renderMain(true); });
+  main.querySelectorAll('[data-ag-create]').forEach(el => el.onclick = () => { const v = el.getAttribute('data-ag-create'); createModal(v ? { day: +v } : null); });
+  q('[data-ag-picker]', el => el.onclick = () => { pickerOpen = !pickerOpen; const d = new Date(['dia', 'semana', 'custom'].includes(mode) ? selDay : new Date(moY, moM, 1).getTime()); pkY = d.getFullYear(); pkM = d.getMonth(); mainSig = ''; renderMain(true); });
   main.querySelectorAll('[data-ag-pkclose]').forEach(el => el.onclick = () => { pickerOpen = false; mainSig = ''; renderMain(true); });
   main.querySelectorAll('[data-ag-pkmo]').forEach(el => el.onclick = () => { const d = new Date(pkY, pkM + +el.getAttribute('data-ag-pkmo'), 1); pkY = d.getFullYear(); pkM = d.getMonth(); mainSig = ''; renderMain(true); });
   main.querySelectorAll('[data-ag-pkday]').forEach(el => el.onclick = () => pickDay(+el.getAttribute('data-ag-pkday')));
-  main.querySelectorAll('[data-ag-day]').forEach(el => el.onclick = () => { mode = 'dia'; try{ localStorage.setItem('agMode', 'dia'); }catch(e){} pickDay(+el.getAttribute('data-ag-day')); });
-  main.querySelectorAll('[data-ag-wk]').forEach(el => el.onclick = () => goWeek(+el.getAttribute('data-ag-wk')));
+  main.querySelectorAll('[data-ag-day]').forEach(el => el.onclick = e => { if(e.target.closest('[data-card]') || Date.now() - lastDragEnd < 450) return; mode = 'dia'; savePref(); pickDay(+el.getAttribute('data-ag-day')); });
+  main.querySelectorAll('.ag-gcol').forEach(el => el.onclick = e => {
+    if(e.target.closest('[data-card]') || Date.now() - lastDragEnd < 450) return;
+    const b2 = curBoard(); if(!canAdd(b2)) return;
+    const r = el.getBoundingClientRect(), h0 = +el.getAttribute('data-h0'), n = +el.getAttribute('data-n');
+    const mins = Math.max(0, Math.min(23 * 60 + 45, Math.floor((h0 * 60 + (e.clientY - r.top) / r.height * n * 60) / 30) * 30));
+    createModal({ day: +el.getAttribute('data-day'), mins });
+  });
+  q('#agInbBtn', el => el.onclick = addInbox);
+  q('#agInbIn', el => { el.onkeydown = e => { if(e.key === 'Enter'){ e.preventDefault(); addInbox(); } }; });
   main.querySelectorAll('[data-ag-compose]').forEach(el => el.onclick = () => { composing = el.getAttribute('data-ag-compose'); mainSig = ''; renderMain(true); const t = byId('agCompose'); if(t) t.focus(); });
   main.querySelectorAll('[data-ag-cancelcompose]').forEach(el => el.onclick = () => { composing = null; mainSig = ''; renderMain(true); });
   main.querySelectorAll('[data-ag-addcard]').forEach(el => el.onclick = () => submitCard(el.getAttribute('data-ag-addcard')));
@@ -879,6 +1063,13 @@ function bindMain(main, b){
   if(nl){ nl.onkeydown = e => { if(e.key === 'Enter'){ e.preventDefault(); submitList(); } else if(e.key === 'Escape'){ composing = null; mainSig = ''; renderMain(true); } }; if(!nl.value) nl.focus(); }
   main.querySelectorAll('[data-ag-listmenu]').forEach(el => el.onclick = () => listMenu(el, el.getAttribute('data-ag-listmenu')));
 
+  main.querySelectorAll('.ag-ev[data-card], .ag-gev[data-card], .ag-inb[data-card]').forEach(el => {
+    onActivate(el, () => { if(Date.now() - lastDragEnd < 450) return; openSheet({ kind: 'card', id: el.getAttribute('data-card') }); });
+    if(canEditCard(b, cardById(el.getAttribute('data-card')))){
+      el.addEventListener('touchstart', e => calDragStart(e, el), { passive: true });
+      el.addEventListener('mousedown', e => calDragStart(e, el));
+    }
+  });
   main.querySelectorAll('.ag-card').forEach(el => {
     onActivate(el, () => { if(Date.now() - lastDragEnd < 450) return; openSheet({ kind: 'card', id: el.getAttribute('data-card') }); });
     if(el.hasAttribute('data-drag')){
@@ -925,8 +1116,18 @@ function bindSheet(main, b){
     }
     q('#agDesc', el => el.onblur = () => { const v = el.value.trim(); if(v !== (c.desc || '').trim()) patchCard(c.id, { desc: v }); });
     q('#agMove', el => el.onchange = () => moveToList(c, el.value));
-    q('#agDue', el => el.onchange = () => patchCard(c.id, { due: el.value ? new Date(el.value).getTime() : null }));
-    q('#agDueClear', el => el.onclick = () => patchCard(c.id, { due: null }));
+    q('#agDue', el => el.onchange = () => {
+      if(!el.value){ patchCard(c.id, { due: null, allDay: false }); return; }
+      const t = c.allDay ? new Date(el.value + 'T00:00').getTime() + 86399000 : new Date(el.value).getTime();
+      patchCard(c.id, { due: t, week: weekStart(t) });
+    });
+    q('#agDueClear', el => el.onclick = () => patchCard(c.id, { due: null, allDay: false }));
+    q('#agAllDay', el => el.onchange = () => {
+      const base = c.due || (cardDate(c));
+      patchCard(c.id, el.checked ? { allDay: true, due: sod(base) + 86399000 } : { allDay: false, due: sod(base) + 9 * 3600000 });
+    });
+    q('#agStart', el => el.onchange = () => patchCard(c.id, { start: el.value ? new Date(el.value + 'T00:00').getTime() : null }));
+    q('#agStartClear', el => el.onclick = () => patchCard(c.id, { start: null }));
     main.querySelectorAll('[data-ag-assign]').forEach(el => el.onclick = () => toggleAssignee(c, el.getAttribute('data-ag-assign')));
     main.querySelectorAll('[data-ag-chk]').forEach(el => el.onclick = () => toggleChk(c, el.getAttribute('data-ag-chk')));
     main.querySelectorAll('[data-ag-chkdel]').forEach(el => el.onclick = () => delChk(c, el.getAttribute('data-ag-chkdel')));
@@ -1043,6 +1244,160 @@ function submitCard(listId){
   }).catch(fail);
   t.focus();
 }
+function addInbox(){
+  const t = byId('agInbIn'); if(!t) return;
+  const title = t.value.trim().replace(/\s+/g, ' '); if(!title){ t.focus(); return; }
+  const target = lists.find(l => !isDayList(l) && !/conclu/i.test(l.name));
+  if(!target){ toast('Crie uma lista (por exemplo, “A fazer”) para usar a caixa de entrada'); return; }
+  const last = cards.filter(c => c.listId === target.id).sort((a, z) => (a.order || 0) - (z.order || 0)).slice(-1)[0];
+  t.value = '';
+  bRef().collection('cards').add({
+    listId: target.id, title, desc: '', week: curWeek(), order: (last ? last.order : 0) + 1024, due: null, done: false, assignees: [], checklist: [],
+    createdBy: myUid, createdByName: myName(), createdAt: FV().serverTimestamp(), updatedAt: FV().serverTimestamp()
+  }).catch(fail);
+  t.focus();
+}
+function createModal(pre){
+  const b = curBoard(); if(!b || !canAdd(b)){ toast('Você não pode incluir cartões nesta agenda'); return; }
+  pre = pre || {};
+  const day = pre.day != null ? pre.day : (['dia', 'semana', 'custom'].includes(mode) ? selDay : sod(Date.now()));
+  const dstr = toLocalInput(day).slice(0, 10);
+  const tm = pre.mins != null ? pad2(Math.floor(pre.mins / 60)) + ':' + pad2(pre.mins % 60) : '';
+  const def = dayListFor(day) || lists.find(l => !isDayList(l) && !/conclu/i.test(l.name)) || lists[0];
+  const root = byId('modalRoot');
+  root.innerHTML = `<div class="modal-bg" id="agCBg"><div class="modal" style="max-width:400px;" role="dialog" aria-modal="true" aria-label="Novo cartão">
+    <h3>Novo cartão</h3>
+    <div class="ag-lbl">Título</div><input class="ag-field" id="agCTitle" maxlength="300" placeholder="O que precisa ser feito?" autocomplete="off">
+    <div class="ag-roww" style="margin-top:10px"><div style="flex:1"><div class="ag-lbl">Data</div><input class="ag-field" type="date" id="agCDate" value="${attr(dstr)}"></div>
+      <div style="width:122px"><div class="ag-lbl">Hora (opcional)</div><input class="ag-field" type="time" id="agCTime" value="${attr(tm)}"></div></div>
+    <div class="ag-lbl" style="margin-top:10px">Lista</div>
+    <select class="ag-select" id="agCList">${lists.map(l => `<option value="${attr(l.id)}"${def && l.id === def.id ? ' selected' : ''}>${esc(l.name)}</option>`).join('')}</select>
+    <div class="ag-hint" id="agCErr" style="color:var(--danger); min-height:18px; margin-top:6px"></div>
+    <div class="actions"><button class="cancel" id="agCNo">Cancelar</button><button class="confirm" id="agCYes">Criar cartão</button></div></div></div>`;
+  const close = () => { root.innerHTML = ''; };
+  byId('agCNo').onclick = close;
+  byId('agCBg').onclick = e => { if(e.target.id === 'agCBg') close(); };
+  const dEl = byId('agCDate'), lEl = byId('agCList'), err = byId('agCErr');
+  dEl.onchange = () => { const d = dEl.value ? new Date(dEl.value + 'T00:00').getTime() : null; const l = d && dayListFor(d); if(l && isDayList(lists.find(x => x.id === lEl.value))) lEl.value = l.id; };
+  const go = () => {
+    const title = byId('agCTitle').value.trim().replace(/\s+/g, ' ');
+    if(!title){ err.textContent = 'Escreva um título.'; byId('agCTitle').focus(); return; }
+    if(!lists.length){ err.textContent = 'Crie uma lista antes de incluir cartões.'; return; }
+    const date = dEl.value ? new Date(dEl.value + 'T00:00').getTime() : sod(Date.now());
+    if(!canManage(b) && !weekOpen(weekStart(date))){ err.textContent = 'Só a semana atual e a próxima aceitam cartões novos.'; return; }
+    const tv = byId('agCTime').value; const mins = tv ? (+tv.slice(0, 2)) * 60 + (+tv.slice(3, 5)) : null;
+    let list = lists.find(l => l.id === lEl.value); let extra = {};
+    if(isDayList(list)){ list = dayListFor(date) || list; if(mins !== null) extra = { due: date + mins * 60000, allDay: false }; }
+    else if(mins !== null) extra = { due: date + mins * 60000, allDay: false };
+    else extra = { due: date + 86399000, allDay: true };
+    const w = weekStart(date);
+    const last = cards.filter(c => c.listId === list.id && cardWeek(c) === w).sort((a, z) => (a.order || 0) - (z.order || 0)).slice(-1)[0];
+    bRef().collection('cards').add(Object.assign({
+      listId: list.id, title, desc: '', week: w, order: (last ? last.order : 0) + 1024, due: null, done: false, assignees: [], checklist: [],
+      createdBy: myUid, createdByName: myName(), createdAt: FV().serverTimestamp(), updatedAt: FV().serverTimestamp()
+    }, extra)).then(() => toast('Cartão criado')).catch(fail);
+    close();
+  };
+  byId('agCYes').onclick = go;
+  byId('agCTitle').onkeydown = e => { if(e.key === 'Enter'){ e.preventDefault(); go(); } else if(e.key === 'Escape') close(); };
+  byId('agCTitle').focus();
+}
+function customModal(){
+  const root = byId('modalRoot');
+  root.innerHTML = `<div class="modal-bg" id="agPBg"><div class="modal" style="max-width:340px;" role="dialog" aria-modal="true" aria-label="Personalizar dias">
+    <h3>Quantos dias mostrar?</h3>
+    <select class="ag-select" id="agPN" aria-label="Número de dias">${[2, 3, 4, 5, 6, 7].map(n => `<option value="${n}"${n === customN ? ' selected' : ''}>${n} dias a partir do dia escolhido</option>`).join('')}</select>
+    <div class="actions" style="margin-top:14px"><button class="cancel" id="agPNo">Cancelar</button><button class="confirm" id="agPYes">Aplicar</button></div></div></div>`;
+  const close = () => { root.innerHTML = ''; };
+  byId('agPNo').onclick = close; byId('agPBg').onclick = e => { if(e.target.id === 'agPBg') close(); };
+  byId('agPYes').onclick = () => { customN = +byId('agPN').value; close(); setMode('custom'); };
+}
+function rescheduleCard(c, day, mins){
+  const b = curBoard(); if(!b || !c) return;
+  if(!canEditCard(b, c)){ toast('Você não pode alterar este cartão'); return; }
+  if(!canManage(b) && !weekOpen(weekStart(day))){ toast('Só a semana atual e a próxima aceitam cartões'); return; }
+  const patch = { week: weekStart(day) };
+  const t = mins != null ? mins : (hasTime(c) ? minsOf(c.due) : null);
+  if(t == null){ patch.allDay = true; patch.due = day + 86399000; } else { patch.allDay = false; patch.due = day + t * 60000; }
+  if(c.start) patch.start = c.start + (day - cardDate(c));
+  const cur = lists.find(l => l.id === c.listId);
+  if(isDayList(cur)){ const tg = dayListFor(day); if(tg && tg.id !== c.listId){ patch.listId = tg.id; const last = cards.filter(x => x.listId === tg.id && cardWeek(x) === patch.week).sort((a, z) => (a.order || 0) - (z.order || 0)).slice(-1)[0]; patch.order = (last ? last.order : 0) + 1024; } }
+  patchCard(c.id, patch);
+}
+function unschedule(c){
+  const b = curBoard(); if(!b || !c || !canEditCard(b, c)) return;
+  const cur = lists.find(l => l.id === c.listId);
+  const patch = { due: null, allDay: false, start: null };
+  if(isDayList(cur)){ const tg = lists.find(l => !isDayList(l) && !/conclu/i.test(l.name)); if(!tg){ toast('Crie uma lista (por exemplo, “A fazer”) para usar a caixa de entrada'); return; } patch.listId = tg.id; }
+  patchCard(c.id, patch);
+}
+
+// arrastar cartões entre dias e horários (Dia, Semana, Mês, Agenda e Caixa de entrada)
+function calDragStart(e, el){
+  if(cdrag) return;
+  if(e.type === 'mousedown' && e.button !== 0) return;
+  const touch = e.type === 'touchstart', pt = touch ? e.touches[0] : e;
+  const st = { el, id: el.getAttribute('data-card'), sx: pt.clientX, sy: pt.clientY, x: pt.clientX, y: pt.clientY, touch, active: false, timer: null, ghost: null, over: null };
+  cdrag = st;
+  if(touch) st.timer = setTimeout(() => { if(cdrag === st) calBegin(st); }, 340);
+  document.addEventListener(touch ? 'touchmove' : 'mousemove', calMove, { passive: false });
+  document.addEventListener(touch ? 'touchend' : 'mouseup', calEnd);
+  if(touch) document.addEventListener('touchcancel', calCancel);
+}
+function calBegin(st){
+  st.active = true;
+  const r = st.el.getBoundingClientRect();
+  const g = st.el.cloneNode(true); g.classList.add('ag-cghost'); g.removeAttribute('data-card'); g.removeAttribute('tabindex');
+  g.style.width = Math.min(Math.max(r.width, 140), 240) + 'px'; g.style.left = '0'; g.style.top = '0'; g.style.height = 'auto';
+  document.body.appendChild(g); st.ghost = g; st.el.classList.add('ghosted');
+  document.body.classList.add('ag-dragging');
+  if(navigator.vibrate) try{ navigator.vibrate(12); }catch(e){}
+  calPlace(st);
+}
+function calPlace(st){
+  st.ghost.style.transform = `translate(${st.x - 24}px, ${st.y - 16}px) rotate(2deg)`;
+  st.ghost.style.visibility = 'hidden';
+  const hit = document.elementFromPoint(st.x, st.y);
+  st.ghost.style.visibility = '';
+  const tg = hit && hit.closest('[data-drop-day], [data-drop-inbox]');
+  if(st.over !== tg){ if(st.over) st.over.classList.remove('drop'); if(tg) tg.classList.add('drop'); st.over = tg; }
+}
+function calMove(e){
+  const st = cdrag; if(!st) return;
+  const pt = e.touches ? e.touches[0] : e; st.x = pt.clientX; st.y = pt.clientY;
+  if(!st.active){
+    if(Math.hypot(st.x - st.sx, st.y - st.sy) > (st.touch ? 10 : 5)){ if(st.touch){ calCancel(); return; } calBegin(st); } else return;
+  }
+  if(e.cancelable) e.preventDefault();
+  calPlace(st);
+}
+function calCleanup(){
+  const st = cdrag; if(!st) return;
+  clearTimeout(st.timer);
+  document.removeEventListener('mousemove', calMove); document.removeEventListener('touchmove', calMove);
+  document.removeEventListener('mouseup', calEnd); document.removeEventListener('touchend', calEnd); document.removeEventListener('touchcancel', calCancel);
+  if(st.ghost) st.ghost.remove(); if(st.over) st.over.classList.remove('drop');
+  st.el.classList.remove('ghosted'); document.body.classList.remove('ag-dragging');
+  cdrag = null;
+}
+function calCancel(){ calCleanup(); }
+function calEnd(){
+  const st = cdrag; if(!st) return;
+  const was = st.active, over = st.over, y = st.y, id = st.id;
+  calCleanup();
+  if(!was) return;
+  lastDragEnd = Date.now();
+  const c = cardById(id); if(!c || !over) return;
+  if(over.hasAttribute('data-drop-inbox')){ unschedule(c); return; }
+  const day = +over.getAttribute('data-drop-day');
+  let mins = null;
+  if(over.classList.contains('ag-gcol')){
+    const r = over.getBoundingClientRect(), h0 = +over.getAttribute('data-h0'), n = +over.getAttribute('data-n');
+    mins = Math.max(0, Math.min(23 * 60 + 45, Math.round((h0 * 60 + (y - r.top) / r.height * n * 60) / 15) * 15));
+  }
+  rescheduleCard(c, day, mins);
+}
+
 function submitList(){
   const t = byId('agNewList'); if(!t) return;
   const name = t.value.trim().replace(/\s+/g, ' ');
